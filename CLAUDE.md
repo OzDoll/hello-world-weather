@@ -4,12 +4,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-A weather/location demo app: a static frontend (`index.html`) that shows the visitor's current weather, local time, and location on load, with a map and an admin-only activity log backed by a small Azure API. Two independently deployed parts:
+A weather/location demo app: a static frontend (`index.html`) that shows the visitor's current weather, local time, and location on load, with a map and an admin-only activity log backed by a small Azure API. Three independently deployed parts:
 
 - **Frontend** — `index.html`, single file, no build step. Live at https://ozdoll.github.io/hello-world-weather/, deployed via GitHub Pages' built-in deployment, which rebuilds automatically on *any* push to `main` — no workflow file involved.
 - **Backend** — `api/`, an Azure Functions (Node.js v4 programming model) project backed by Cosmos DB. Deployed by `.github/workflows/deploy-api.yml`, which only triggers on pushes touching `api/**`.
+- **Infrastructure** — `infra/`, Bicep templates for the Azure resources the backend runs on. Deployed by `.github/workflows/deploy-infra.yml`, which only triggers on pushes touching `infra/**`.
 
-Pushing to `main` is the deploy step for both — there's no separate manual build/publish command for either half. **The Azure resources themselves (resource group, storage account, Function App, Cosmos DB account/database/container) are not managed by any pipeline or IaC file** — they were created once via one-off `az` CLI commands (see Architecture below) and any infrastructure change (region, TTL, new container, etc.) needs manual `az` commands again, not a git push.
+Pushing to `main` is the deploy step for all three — there's no separate manual build/publish command for any of them, and each workflow is path-filtered so changing one part doesn't redeploy the others. The Azure resources were originally created by hand via one-off `az` CLI commands, then retrofitted into `infra/` afterward (Bicep written to match live state, verified with `az deployment group what-if`) — see Architecture below for what's actually provisioned and the two known quirks worth knowing before touching it again.
 
 ## Commands
 
@@ -32,6 +33,14 @@ Backend deploy (normally automatic via the GitHub Actions workflow on push): man
 func azure functionapp publish hello-world-weather-api
 ```
 from inside `api/`.
+
+Infra: validate/preview/deploy manually with (also normally automatic via GitHub Actions on push to `infra/**`):
+```
+az deployment group validate --resource-group hello-world-weather-rg --template-file infra/main.bicep --parameters infra/main.bicepparam
+az deployment group what-if   --resource-group hello-world-weather-rg --template-file infra/main.bicep --parameters infra/main.bicepparam
+az deployment group create    --resource-group hello-world-weather-rg --template-file infra/main.bicep --parameters infra/main.bicepparam
+```
+Always read the `what-if` diff before `create`. See `infra/README.md` for what a clean diff looks like (some cosmetic drift from Azure's own auto-populated defaults is expected and harmless).
 
 ## Architecture
 
@@ -59,13 +68,26 @@ Node.js v4 programming model, two HTTP-triggered functions sharing the `/api/log
 
 Both read the Cosmos connection string from the `COSMOS_CONNECTION_STRING` app setting (local: `api/local.settings.json`; deployed: a Function App setting, not committed anywhere).
 
-**Provisioned Azure resources** (subscription `personal`, all one-off `az` commands, no IaC):
+**Provisioned Azure resources** (subscription `personal`) — provisioned by hand originally, now codified in `infra/` (see below):
 - Resource group `hello-world-weather-rg`
 - Storage account `helloworldweathersa` (West Europe) — required by the Functions runtime, not used directly by app code
-- Function App `hello-world-weather-api` (West Europe, Consumption/Y1 plan, Node 22, Functions v4) — https://hello-world-weather-api.azurewebsites.net/api/log
+- Function App `hello-world-weather-api` (West Europe, Consumption/Y1 plan, **Windows** — `az functionapp create` defaults to Windows when `--os-type` isn't passed — Node 22, Functions v4) — https://hello-world-weather-api.azurewebsites.net/api/log
+- Application Insights `hello-world-weather-api` — auto-created alongside the Function App by `az functionapp create`, not something explicitly requested; it's real and wired up (`APPLICATIONINSIGHTS_CONNECTION_STRING`), so it's modeled in `infra/` too
 - Cosmos DB account `hello-world-weather-cosmos` — **Sweden Central**, not West Europe like the rest: West Europe *and* North Europe both rejected zone-redundant free-tier account creation with `ServiceUnavailable` (regional capacity, not a config issue) when this was set up, so Cosmos ended up in a different region from the Function App. Cross-region calls between them are negligible for this workload; if this is ever revisited, re-check whether West/North Europe capacity has freed up.
   - Free tier enabled (first 1000 RU/s + 25GB storage free forever — this workload should stay entirely inside it)
   - Database `WeatherApp`, container `Log`, partition key `/id`, container-level TTL `2592000` seconds (30 days) so entries self-prune
-- CORS on the Function App allows `https://ozdoll.github.io` and `http://localhost:8000` (`az functionapp cors add`)
+- CORS on the Function App allows `https://ozdoll.github.io` and `http://localhost:8000`
 
-**CI/CD:** `.github/workflows/deploy-api.yml` runs `Azure/functions-action@v1` against `hello-world-weather-api`, authenticated via the `AZURE_FUNCTIONAPP_PUBLISH_PROFILE` GitHub secret (a publish profile downloaded once via `az functionapp deployment list-publishing-profiles`). Triggers only on pushes touching `api/**`, plus manual `workflow_dispatch`.
+**CI/CD:** `.github/workflows/deploy-api.yml` runs `Azure/functions-action@v1` against `hello-world-weather-api`, authenticated via the `AZURE_FUNCTIONAPP_PUBLISH_PROFILE` GitHub secret (a publish profile downloaded once via `az functionapp deployment list-publishing-profiles`). Triggers only on pushes touching `api/**`, plus manual `workflow_dispatch`. This deploys *app code only* — it does not touch the underlying resources; that's `infra/`'s job.
+
+### Infrastructure (`infra/`) — Bicep
+
+`infra/main.bicep` orchestrates four modules (`infra/modules/`): `storage.bicep`, `monitoring.bicep` (Application Insights), `cosmos.bicep` (account + database + container), `functionApp.bicep` (plan + Function App, pulls in the storage/Cosmos/App Insights outputs). `infra/main.bicepparam` holds the parameter values. Full resource inventory, the Sweden Central rationale, and what's intentionally left unmanaged (Azure's default Application Insights smart-detection alert resources) are documented in `infra/README.md` rather than duplicated here.
+
+**CI/CD:** `.github/workflows/deploy-infra.yml` runs `az deployment group validate` then `az deployment group create` against `hello-world-weather-rg` on pushes touching `infra/**`, plus manual `workflow_dispatch`. Auth is OIDC via `azure/login@v2` — no client secret stored anywhere, just three identifier secrets (`AZURE_CLIENT_ID`, `AZURE_TENANT_ID`, `AZURE_SUBSCRIPTION_ID`). The backing Azure AD app registration is `hello-world-weather-infra-deploy` (app ID `c3908590-6c04-44fb-a0fe-097a904b7b98`), with a `Contributor` role assignment scoped to only `hello-world-weather-rg`, not the subscription.
+
+**OIDC subject claim gotcha:** the federated identity credential's `subject` is **not** the commonly-documented plain format `repo:<owner>/<repo>:ref:refs/heads/<branch>`. The token GitHub actually issues for this repo includes immutable org/repo IDs appended after `@`:
+```
+repo:OzDoll@82967682/hello-world-weather@1332474030:ref:refs/heads/main
+```
+The credential was first created with the plain format, which produced `AADSTS700213: No matching federated identity record found` on the first workflow run — the plain format simply didn't match what GitHub presented. If a federated credential is ever recreated (for this repo or a new one), don't assume the plain format: run the workflow once, pull the exact subject from the `azure/login` step's log (it prints `subject claim - ...` right before any mismatch error), and set the credential to match that verbatim rather than guessing.
