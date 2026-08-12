@@ -118,6 +118,45 @@
     overflow: hidden;
     display: none;
   }
+  #log-btn {
+    margin-top: 0.75rem;
+    background: transparent;
+    color: var(--accent);
+    border: 1px solid var(--accent);
+  }
+  #log-btn:hover { background: transparent; opacity: 0.8; }
+  #log-panel {
+    margin-top: 1.25rem;
+    text-align: left;
+    display: none;
+  }
+  #log-list {
+    max-height: 300px;
+    overflow-y: auto;
+    padding-right: 0.25rem;
+  }
+  .log-entry {
+    padding: 0.75rem 0;
+    border-bottom: 1px solid var(--muted);
+    font-size: 0.9rem;
+  }
+  .log-entry:last-child { border-bottom: none; }
+  .log-entry .log-time {
+    color: var(--muted);
+    font-size: 0.8rem;
+  }
+  .log-entry .log-city {
+    font-weight: 600;
+  }
+  #clear-log-btn {
+    margin-top: 0.75rem;
+    background: transparent;
+    color: var(--muted);
+    border: 1px solid var(--muted);
+    padding: 0.5rem 1rem;
+    font-size: 0.85rem;
+  }
+  #clear-log-btn:hover { background: transparent; opacity: 0.8; }
   #theme-toggle {
     background: var(--bg);
     color: var(--text);
@@ -146,6 +185,12 @@
       <div id="result"><p class="meta">Locating you…</p></div>
       <button id="map-btn" disabled>📍 Show on map</button>
       <div id="map"></div>
+      <br>
+      <button id="log-btn" hidden>🗂️ View log</button>
+      <div id="log-panel">
+        <div id="log-list"></div>
+        <button id="clear-log-btn">Clear log</button>
+      </div>
     </div>
   </main>
 
@@ -181,9 +226,19 @@
   const result = document.getElementById('result');
   const mapBtn = document.getElementById('map-btn');
   const mapEl = document.getElementById('map');
+  const logBtn = document.getElementById('log-btn');
+  const logPanel = document.getElementById('log-panel');
+  const logList = document.getElementById('log-list');
+  const clearLogBtn = document.getElementById('clear-log-btn');
+
+  const LOG_KEY = 'weatherLog';
+  const LOG_LIMIT = 50;
+  const isAdmin = new URLSearchParams(window.location.search).get('admin') === '1';
+  if (isAdmin) logBtn.hidden = false;
 
   let coords = null;
   let leafletMap = null;
+  let lastReading = null;
 
   const weatherCodes = {
     0: 'Clear sky', 1: 'Mainly clear', 2: 'Partly cloudy', 3: 'Overcast',
@@ -241,6 +296,17 @@
           weekday: 'short', hour: '2-digit', minute: '2-digit'
         });
 
+        lastReading = {
+          city,
+          latitude,
+          longitude,
+          temperature: Math.round(cw.temperature),
+          description: describe(cw.weathercode),
+          wind: Math.round(cw.windspeed),
+          timezone: data.timezone,
+          localTime
+        };
+
         result.innerHTML = `
           <p class="temp">${Math.round(cw.temperature)}°C</p>
           <p class="desc">${describe(cw.weathercode)}</p>
@@ -281,10 +347,66 @@
       L.marker([coords.latitude, coords.longitude]).addTo(leafletMap);
     }
     setTimeout(() => leafletMap.invalidateSize(), 0);
+
+    if (lastReading) saveLogEntry(lastReading);
+  }
+
+  function getLog() {
+    return JSON.parse(localStorage.getItem(LOG_KEY) || '[]');
+  }
+
+  function saveLogEntry(reading) {
+    const log = getLog();
+    log.unshift({ ...reading, loggedAt: new Date().toISOString() });
+    localStorage.setItem(LOG_KEY, JSON.stringify(log.slice(0, LOG_LIMIT)));
+    if (logPanel.style.display === 'block') renderLog();
+    else updateLogButtonCount();
+  }
+
+  function updateLogButtonCount() {
+    const count = getLog().length;
+    logBtn.textContent = count ? `🗂️ View log (${count})` : '🗂️ View log';
+  }
+
+  function renderLog() {
+    const log = getLog();
+    updateLogButtonCount();
+
+    if (!log.length) {
+      logList.innerHTML = '<p class="meta">No entries yet — click Show on map to log one.</p>';
+      return;
+    }
+
+    logList.innerHTML = log.map(e => `
+      <div class="log-entry">
+        <div class="log-time">${new Date(e.loggedAt).toLocaleString()}</div>
+        <div class="log-city">${e.city || 'Unknown location'}</div>
+        <div class="meta">
+          ${e.latitude.toFixed(2)}, ${e.longitude.toFixed(2)}<br>
+          ${e.temperature}°C, ${e.description}<br>
+          💨 Wind ${e.wind} km/h &nbsp;·&nbsp; 🕒 ${e.localTime} (${e.timezone})
+        </div>
+      </div>
+    `).join('');
+  }
+
+  function toggleLog() {
+    const showing = logPanel.style.display === 'block';
+    logPanel.style.display = showing ? 'none' : 'block';
+    if (!showing) renderLog();
+  }
+
+  function clearLog() {
+    if (!confirm('Clear the local log?')) return;
+    localStorage.removeItem(LOG_KEY);
+    renderLog();
   }
 
   mapBtn.addEventListener('click', toggleMap);
+  logBtn.addEventListener('click', toggleLog);
+  clearLogBtn.addEventListener('click', clearLog);
 
+  updateLogButtonCount();
   loadWeather();
 </script>
 </body>
