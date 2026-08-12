@@ -21,6 +21,8 @@ Everything else in this app is West Europe. When the Cosmos account was first pr
 
 ### App settings are not managed by this Bicep — incident writeup
 
+Full incident report with timeline: [`docs/incidents/2026-08-12-function-app-run-from-package-outage.md`](../docs/incidents/2026-08-12-function-app-run-from-package-outage.md). Summary below.
+
 The first version of this template *did* manage the Function App's app settings (`AzureWebJobsStorage`, `COSMOS_CONNECTION_STRING`, `WEBSITE_RUN_FROM_PACKAGE`, etc.) as an inline `siteConfig.appSettings` array. Deploying it took the site down: `Microsoft.Web/sites` app settings are a **full replace** in ARM, not a merge, and the fixed list didn't include `WEBSITE_RUN_FROM_PACKAGE` at its then-current (deploy-tool-owned) value, so the deployment wiped it. The Function host then failed to start on every request with:
 
 ```
