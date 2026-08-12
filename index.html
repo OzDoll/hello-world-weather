@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hello World Weather</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<style>
+  :root {
+    color-scheme: light dark;
+    --bg: #f5f6fa;
+    --card: #ffffff;
+    --text: #1c1e21;
+    --muted: #6b7280;
+    --accent: #2563eb;
+    --accent-hover: #1d4ed8;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #111318;
+      --card: #1b1e26;
+      --text: #f2f3f5;
+      --muted: #9aa0ab;
+      --accent: #3b82f6;
+      --accent-hover: #60a5fa;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #111318;
+    --card: #1b1e26;
+    --text: #f2f3f5;
+    --muted: #9aa0ab;
+    --accent: #3b82f6;
+    --accent-hover: #60a5fa;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+  .app-header {
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 1rem 1.5rem;
+    background: var(--card);
+    box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+  }
+  .app-header h1 {
+    font-size: 1.25rem;
+    font-weight: 600;
+    margin: 0;
+  }
+  main {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 2rem 1rem;
+  }
+  .card {
+    background: var(--card);
+    border-radius: 16px;
+    padding: 2.5rem;
+    width: min(90vw, 560px);
+    text-align: center;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.08);
+  }
+  button {
+    background: var(--accent);
+    color: white;
+    border: none;
+    border-radius: 10px;
+    padding: 0.85rem 1.5rem;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: background 0.15s ease;
+  }
+  button:hover { background: var(--accent-hover); }
+  button:disabled { opacity: 0.6; cursor: default; }
+
+  #result {
+    min-height: 1.5rem;
+  }
+  .temp {
+    font-size: 2.5rem;
+    font-weight: 600;
+    margin: 0.25rem 0;
+  }
+  .desc {
+    font-size: 1.05rem;
+    margin: 0 0 0.75rem;
+  }
+  .meta {
+    color: var(--muted);
+    font-size: 0.9rem;
+    line-height: 1.5;
+  }
+  .error {
+    color: #dc2626;
+    font-size: 0.9rem;
+  }
+  #map-btn {
+    margin-top: 1.5rem;
+  }
+  #map {
+    margin-top: 1.25rem;
+    height: 420px;
+    border-radius: 12px;
+    overflow: hidden;
+    display: none;
+  }
+  #theme-toggle {
+    background: var(--bg);
+    color: var(--text);
+    border: 1px solid var(--muted);
+    border-radius: 50%;
+    width: 2.5rem;
+    height: 2.5rem;
+    font-size: 1.1rem;
+    line-height: 1;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+  #theme-toggle:hover { background: var(--bg); opacity: 0.85; }
+</style>
+</head>
+<body>
+  <header class="app-header">
+    <h1>I see you ❤️</h1>
+    <button id="theme-toggle" aria-label="Toggle dark mode" title="Toggle dark mode">🌙</button>
+  </header>
+  <main>
+    <div class="card">
+      <div id="result"><p class="meta">Locating you…</p></div>
+      <button id="map-btn" disabled>📍 Show on map</button>
+      <div id="map"></div>
+    </div>
+  </main>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+  const themeToggle = document.getElementById('theme-toggle');
+  const root = document.documentElement;
+
+  function applyTheme(theme) {
+    if (theme) {
+      root.setAttribute('data-theme', theme);
+    } else {
+      root.removeAttribute('data-theme');
+    }
+    const isDark = theme
+      ? theme === 'dark'
+      : window.matchMedia('(prefers-color-scheme: dark)').matches;
+    themeToggle.textContent = isDark ? '☀️' : '🌙';
+  }
+
+  const savedTheme = localStorage.getItem('theme');
+  applyTheme(savedTheme);
+
+  themeToggle.addEventListener('click', () => {
+    const currentlyDark = root.getAttribute('data-theme')
+      ? root.getAttribute('data-theme') === 'dark'
+      : window.matchMedia('(prefers-color-scheme: dark)').matches;
+    const next = currentlyDark ? 'light' : 'dark';
+    localStorage.setItem('theme', next);
+    applyTheme(next);
+  });
+
+  const result = document.getElementById('result');
+  const mapBtn = document.getElementById('map-btn');
+  const mapEl = document.getElementById('map');
+
+  let coords = null;
+  let leafletMap = null;
+
+  const weatherCodes = {
+    0: 'Clear sky', 1: 'Mainly clear', 2: 'Partly cloudy', 3: 'Overcast',
+    45: 'Fog', 48: 'Depositing rime fog',
+    51: 'Light drizzle', 53: 'Moderate drizzle', 55: 'Dense drizzle',
+    61: 'Slight rain', 63: 'Moderate rain', 65: 'Heavy rain',
+    71: 'Slight snow', 73: 'Moderate snow', 75: 'Heavy snow',
+    80: 'Rain showers', 81: 'Moderate rain showers', 82: 'Violent rain showers',
+    95: 'Thunderstorm', 96: 'Thunderstorm with hail', 99: 'Thunderstorm with heavy hail'
+  };
+
+  function describe(code) {
+    return weatherCodes[code] || 'Unknown conditions';
+  }
+
+  async function fetchWeather(lat, lon) {
+    const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current_weather=true&timezone=auto`;
+    const res = await fetch(url);
+    if (!res.ok) throw new Error('Weather request failed');
+    return res.json();
+  }
+
+  async function fetchCity(lat, lon) {
+    try {
+      const url = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lon}`;
+      const res = await fetch(url);
+      if (!res.ok) return null;
+      const data = await res.json();
+      const addr = data.address || {};
+      const place = addr.city || addr.town || addr.village || addr.county;
+      if (!place) return null;
+      return addr.country ? `${place}, ${addr.country}` : place;
+    } catch {
+      return null;
+    }
+  }
+
+  async function loadWeather() {
+    if (!navigator.geolocation) {
+      result.innerHTML = '<p class="error">Geolocation is not supported by this browser.</p>';
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(async (pos) => {
+      try {
+        const { latitude, longitude } = pos.coords;
+        coords = { latitude, longitude };
+        const [data, city] = await Promise.all([
+          fetchWeather(latitude, longitude),
+          fetchCity(latitude, longitude)
+        ]);
+        const cw = data.current_weather;
+
+        const localTime = new Date(cw.time).toLocaleString(undefined, {
+          weekday: 'short', hour: '2-digit', minute: '2-digit'
+        });
+
+        result.innerHTML = `
+          <p class="temp">${Math.round(cw.temperature)}°C</p>
+          <p class="desc">${describe(cw.weathercode)}</p>
+          <p class="meta">
+            🕒 ${localTime} (${data.timezone})<br>
+            💨 Wind ${Math.round(cw.windspeed)} km/h<br>
+            📍 ${city ? `${city} — ` : ''}${latitude.toFixed(2)}, ${longitude.toFixed(2)}
+          </p>
+        `;
+        mapBtn.disabled = false;
+      } catch (err) {
+        result.innerHTML = `<p class="error">${err.message}</p>`;
+      }
+    }, (err) => {
+      result.innerHTML = `<p class="error">Location error: ${err.message}</p>`;
+    });
+  }
+
+  function toggleMap() {
+    if (!coords) return;
+
+    const showing = mapEl.style.display === 'block';
+    if (showing) {
+      mapEl.style.display = 'none';
+      mapBtn.textContent = '📍 Show on map';
+      return;
+    }
+
+    mapEl.style.display = 'block';
+    mapBtn.textContent = '🙈 Hide map';
+
+    if (!leafletMap) {
+      leafletMap = L.map(mapEl).setView([coords.latitude, coords.longitude], 13);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+        maxZoom: 19
+      }).addTo(leafletMap);
+      L.marker([coords.latitude, coords.longitude]).addTo(leafletMap);
+    }
+    setTimeout(() => leafletMap.invalidateSize(), 0);
+  }
+
+  mapBtn.addEventListener('click', toggleMap);
+
+  loadWeather();
+</script>
+</body>
+</html>
