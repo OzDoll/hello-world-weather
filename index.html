@@ -148,15 +148,6 @@
   .log-entry .log-city {
     font-weight: 600;
   }
-  #clear-log-btn {
-    margin-top: 0.75rem;
-    background: transparent;
-    color: var(--muted);
-    border: 1px solid var(--muted);
-    padding: 0.5rem 1rem;
-    font-size: 0.85rem;
-  }
-  #clear-log-btn:hover { background: transparent; opacity: 0.8; }
   #theme-toggle {
     background: var(--bg);
     color: var(--text);
@@ -189,7 +180,6 @@
       <button id="log-btn" hidden>🗂️ View log</button>
       <div id="log-panel">
         <div id="log-list"></div>
-        <button id="clear-log-btn">Clear log</button>
       </div>
     </div>
   </main>
@@ -229,12 +219,12 @@
   const logBtn = document.getElementById('log-btn');
   const logPanel = document.getElementById('log-panel');
   const logList = document.getElementById('log-list');
-  const clearLogBtn = document.getElementById('clear-log-btn');
 
-  const LOG_KEY = 'weatherLog';
-  const LOG_LIMIT = 50;
+  const API_BASE = 'https://hello-world-weather-api.azurewebsites.net/api';
   const isAdmin = new URLSearchParams(window.location.search).get('admin') === '1';
   if (isAdmin) logBtn.hidden = false;
+
+  let adminKey = sessionStorage.getItem('weatherAdminKey') || null;
 
   let coords = null;
   let leafletMap = null;
@@ -351,27 +341,52 @@
     if (lastReading) saveLogEntry(lastReading);
   }
 
-  function getLog() {
-    return JSON.parse(localStorage.getItem(LOG_KEY) || '[]');
-  }
-
   function saveLogEntry(reading) {
-    const log = getLog();
-    log.unshift({ ...reading, loggedAt: new Date().toISOString() });
-    localStorage.setItem(LOG_KEY, JSON.stringify(log.slice(0, LOG_LIMIT)));
-    if (logPanel.style.display === 'block') renderLog();
-    else updateLogButtonCount();
+    fetch(`${API_BASE}/log`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(reading)
+    }).catch(() => {});
   }
 
-  function updateLogButtonCount() {
-    const count = getLog().length;
-    logBtn.textContent = count ? `🗂️ View log (${count})` : '🗂️ View log';
+  async function fetchLog() {
+    let key = adminKey;
+    if (!key) {
+      key = prompt('Enter the admin key to view the log:');
+      if (!key) return null;
+    }
+
+    const res = await fetch(`${API_BASE}/log`, {
+      headers: { 'x-functions-key': key }
+    });
+
+    if (res.status === 401 || res.status === 403) {
+      adminKey = null;
+      sessionStorage.removeItem('weatherAdminKey');
+      throw new Error('Invalid admin key.');
+    }
+    if (!res.ok) throw new Error('Failed to load log.');
+
+    adminKey = key;
+    sessionStorage.setItem('weatherAdminKey', key);
+    return res.json();
   }
 
-  function renderLog() {
-    const log = getLog();
-    updateLogButtonCount();
+  async function renderLog() {
+    logList.innerHTML = '<p class="meta">Loading…</p>';
 
+    let log;
+    try {
+      log = await fetchLog();
+    } catch (err) {
+      logList.innerHTML = `<p class="error">${err.message}</p>`;
+      return;
+    }
+
+    if (log === null) {
+      logList.innerHTML = '<p class="meta">Admin key required.</p>';
+      return;
+    }
     if (!log.length) {
       logList.innerHTML = '<p class="meta">No entries yet — click Show on map to log one.</p>';
       return;
@@ -396,17 +411,9 @@
     if (!showing) renderLog();
   }
 
-  function clearLog() {
-    if (!confirm('Clear the local log?')) return;
-    localStorage.removeItem(LOG_KEY);
-    renderLog();
-  }
-
   mapBtn.addEventListener('click', toggleMap);
   logBtn.addEventListener('click', toggleLog);
-  clearLogBtn.addEventListener('click', clearLog);
 
-  updateLogButtonCount();
   loadWeather();
 </script>
 </body>
