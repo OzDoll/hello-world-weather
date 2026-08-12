@@ -1,0 +1,50 @@
+@description('Short name/prefix used to derive resource names. Kept fixed to match already-provisioned resource names exactly (see infra/README.md) rather than a fresh uniqueString token.')
+param appName string = 'hello-world-weather'
+
+@description('Azure region for most resources (Function App, plan, storage, Application Insights). The Cosmos account\'s actual data region is separately controlled — see modules/cosmos.bicep.')
+param location string = resourceGroup().location
+
+var storageAccountName = 'helloworldweathersa'
+var planName = 'WestEuropePlan'
+var functionAppName = '${appName}-api'
+var appInsightsName = '${appName}-api'
+var cosmosAccountName = '${appName}-cosmos'
+
+module storage 'modules/storage.bicep' = {
+  name: 'storage'
+  params: {
+    storageAccountName: storageAccountName
+    location: location
+  }
+}
+
+module monitoring 'modules/monitoring.bicep' = {
+  name: 'monitoring'
+  params: {
+    appInsightsName: appInsightsName
+    location: location
+  }
+}
+
+module cosmos 'modules/cosmos.bicep' = {
+  name: 'cosmos'
+  params: {
+    cosmosAccountName: cosmosAccountName
+    location: location
+  }
+}
+
+module functionApp 'modules/functionApp.bicep' = {
+  name: 'functionApp'
+  params: {
+    functionAppName: functionAppName
+    planName: planName
+    location: location
+    storageAccountName: storage.outputs.storageAccountName
+    cosmosAccountName: cosmos.outputs.accountName
+    appInsightsConnectionString: monitoring.outputs.connectionString
+  }
+}
+
+output functionAppUrl string = 'https://${functionApp.outputs.defaultHostName}/api'
+output cosmosAccountName string = cosmos.outputs.accountName
