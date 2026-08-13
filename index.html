@@ -528,9 +528,28 @@
 
     const trafficLayer = L.tileLayer(`${API_BASE}/maps/traffic-flow-tile/{z}/{x}/{y}`, {
       maxZoom: 18,
-      opacity: 0.7
+      opacity: 0.4
     }).addTo(leafletMap);
     L.control.layers(null, { 'Traffic': trafficLayer }).addTo(leafletMap);
+
+    const CenterControl = L.Control.extend({
+      options: { position: 'topleft' },
+      onAdd: function () {
+        const container = L.DomUtil.create('div', 'leaflet-bar leaflet-control');
+        const button = L.DomUtil.create('a', '', container);
+        button.href = '#';
+        button.title = 'Center on my location';
+        button.innerHTML = '🎯';
+        button.style.display = 'flex';
+        button.style.alignItems = 'center';
+        button.style.justifyContent = 'center';
+        button.style.fontSize = '16px';
+        L.DomEvent.on(button, 'click', L.DomEvent.stop)
+          .on(button, 'click', () => leafletMap.setView([lat, lon], 17));
+        return container;
+      }
+    });
+    new CenterControl().addTo(leafletMap);
 
     setTimeout(() => leafletMap.invalidateSize(), 0);
   }

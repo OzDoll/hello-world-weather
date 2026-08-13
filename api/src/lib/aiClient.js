@@ -45,7 +45,7 @@ async function completeChat(messages, opts = {}) {
   const params = {
     model: process.env.AZURE_OPENAI_DEPLOYMENT,
     messages,
-    max_completion_tokens: 2000,
+    max_completion_tokens: 4000,
     reasoning_effort: 'low',
     ...opts
   };
