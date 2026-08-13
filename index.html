@@ -70,7 +70,7 @@
     background: var(--card);
     border-radius: 16px;
     padding: 2.5rem;
-    width: min(90vw, 560px);
+    width: min(94vw, 960px);
     text-align: center;
     box-shadow: 0 10px 30px rgba(0,0,0,0.08);
   }
@@ -108,15 +108,72 @@
     color: #dc2626;
     font-size: 0.9rem;
   }
-  #map-btn {
-    margin-top: 1.5rem;
+  .map-row {
+    margin-top: 1.75rem;
+    display: flex;
+    gap: 1rem;
+    align-items: stretch;
+    text-align: left;
   }
   #map {
-    margin-top: 1.25rem;
+    flex: 1 1 60%;
+    min-width: 0;
     height: 420px;
     border-radius: 12px;
     overflow: hidden;
-    display: none;
+  }
+  .intel-panel {
+    flex: 1 1 38%;
+    min-width: 240px;
+    display: flex;
+    flex-direction: column;
+    border: 1px solid var(--muted);
+    border-radius: 12px;
+    overflow: hidden;
+  }
+  .intel-tabs {
+    display: flex;
+    border-bottom: 1px solid var(--muted);
+  }
+  .intel-tab {
+    flex: 1;
+    background: transparent;
+    color: var(--muted);
+    border: none;
+    border-radius: 0;
+    padding: 0.75rem 0.5rem;
+    font-size: 0.85rem;
+  }
+  .intel-tab:hover { background: transparent; opacity: 0.8; }
+  .intel-tab.active {
+    color: var(--accent);
+    font-weight: 600;
+    box-shadow: inset 0 -2px 0 var(--accent);
+  }
+  .intel-panes {
+    flex: 1;
+    overflow-y: auto;
+    padding: 1rem;
+  }
+  .intel-pane { display: none; }
+  .intel-pane.active { display: block; }
+  .overview-panel {
+    margin-top: 1.25rem;
+    text-align: left;
+    padding: 1.25rem;
+    border: 1px solid var(--muted);
+    border-radius: 12px;
+  }
+  .overview-panel h2 {
+    font-size: 1.05rem;
+    margin: 0 0 0.5rem;
+  }
+  .overview-panel p {
+    margin: 0;
+  }
+  @media (max-width: 720px) {
+    .map-row { flex-direction: column; }
+    #map, .intel-panel { flex: none; width: 100%; }
   }
   #log-btn {
     margin-top: 0.75rem;
@@ -174,8 +231,34 @@
   <main>
     <div class="card">
       <div id="result"><p class="meta">Locating you…</p></div>
-      <button id="map-btn" disabled>📍 Show on map</button>
-      <div id="map"></div>
+
+      <div class="map-row">
+        <div id="map"></div>
+        <div class="intel-panel">
+          <div class="intel-tabs">
+            <button class="intel-tab active" data-tab="news">📰 News</button>
+            <button class="intel-tab" data-tab="traffic">🚦 Traffic</button>
+            <button class="intel-tab" data-tab="events">🎉 Events</button>
+          </div>
+          <div class="intel-panes">
+            <div class="intel-pane active" data-pane="news">
+              <p class="meta">AI-summarized news within 5km of you — coming soon.</p>
+            </div>
+            <div class="intel-pane" data-pane="traffic">
+              <p class="meta">AI-summarized traffic within 5km of you — coming soon.</p>
+            </div>
+            <div class="intel-pane" data-pane="events">
+              <p class="meta">AI-summarized events within 5km of you — coming soon.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="overview-panel">
+        <h2>🧠 Overview</h2>
+        <p class="meta">An AI-generated summary combining News, Traffic, and Events within 5km — coming soon.</p>
+      </div>
+
       <br>
       <button id="log-btn" hidden>🗂️ View log</button>
       <div id="log-panel">
@@ -214,7 +297,6 @@
   });
 
   const result = document.getElementById('result');
-  const mapBtn = document.getElementById('map-btn');
   const mapEl = document.getElementById('map');
   const logBtn = document.getElementById('log-btn');
   const logPanel = document.getElementById('log-panel');
@@ -226,7 +308,6 @@
 
   let adminKey = sessionStorage.getItem('weatherAdminKey') || null;
 
-  let coords = null;
   let leafletMap = null;
   let lastReading = null;
 
@@ -275,7 +356,6 @@
     navigator.geolocation.getCurrentPosition(async (pos) => {
       try {
         const { latitude, longitude } = pos.coords;
-        coords = { latitude, longitude };
         const [data, city] = await Promise.all([
           fetchWeather(latitude, longitude),
           fetchCity(latitude, longitude)
@@ -306,7 +386,9 @@
             📍 ${city ? `${city} — ` : ''}${latitude.toFixed(2)}, ${longitude.toFixed(2)}
           </p>
         `;
-        mapBtn.disabled = false;
+
+        initMap(latitude, longitude);
+        saveLogEntry(lastReading);
       } catch (err) {
         result.innerHTML = `<p class="error">${err.message}</p>`;
       }
@@ -315,30 +397,30 @@
     });
   }
 
-  function toggleMap() {
-    if (!coords) return;
+  function initMap(lat, lon) {
+    if (leafletMap) return;
 
-    const showing = mapEl.style.display === 'block';
-    if (showing) {
-      mapEl.style.display = 'none';
-      mapBtn.textContent = '📍 Show on map';
-      return;
-    }
-
-    mapEl.style.display = 'block';
-    mapBtn.textContent = '🙈 Hide map';
-
-    if (!leafletMap) {
-      leafletMap = L.map(mapEl).setView([coords.latitude, coords.longitude], 13);
-      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-        maxZoom: 19
-      }).addTo(leafletMap);
-      L.marker([coords.latitude, coords.longitude]).addTo(leafletMap);
-    }
+    leafletMap = L.map(mapEl).setView([lat, lon], 13);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+      maxZoom: 19
+    }).addTo(leafletMap);
+    L.marker([lat, lon]).addTo(leafletMap);
     setTimeout(() => leafletMap.invalidateSize(), 0);
+  }
 
-    if (lastReading) saveLogEntry(lastReading);
+  function initIntelTabs() {
+    const tabs = document.querySelectorAll('.intel-tab');
+    const panes = document.querySelectorAll('.intel-pane');
+
+    tabs.forEach(tab => {
+      tab.addEventListener('click', () => {
+        tabs.forEach(t => t.classList.remove('active'));
+        panes.forEach(p => p.classList.remove('active'));
+        tab.classList.add('active');
+        document.querySelector(`.intel-pane[data-pane="${tab.dataset.tab}"]`).classList.add('active');
+      });
+    });
   }
 
   function saveLogEntry(reading) {
@@ -388,7 +470,7 @@
       return;
     }
     if (!log.length) {
-      logList.innerHTML = '<p class="meta">No entries yet — click Show on map to log one.</p>';
+      logList.innerHTML = '<p class="meta">No entries yet.</p>';
       return;
     }
 
@@ -411,9 +493,9 @@
     if (!showing) renderLog();
   }
 
-  mapBtn.addEventListener('click', toggleMap);
   logBtn.addEventListener('click', toggleLog);
 
+  initIntelTabs();
   loadWeather();
 </script>
 </body>
