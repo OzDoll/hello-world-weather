@@ -48,7 +48,6 @@ module maps 'modules/maps.bicep' = {
   name: 'maps'
   params: {
     mapsAccountName: mapsAccountName
-    readerPrincipalId: functionApp.outputs.principalId
   }
 }
 

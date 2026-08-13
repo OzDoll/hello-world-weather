@@ -125,6 +125,7 @@
   .intel-panel {
     flex: 1 1 38%;
     min-width: 240px;
+    height: 420px;
     display: flex;
     flex-direction: column;
     border: 1px solid var(--muted);
@@ -168,8 +169,22 @@
     font-size: 1.05rem;
     margin: 0 0 0.5rem;
   }
-  .overview-panel p {
-    margin: 0;
+  #overview-text {
+    max-height: 200px;
+    overflow-y: auto;
+    padding-right: 0.25rem;
+  }
+  .intel-pane p,
+  #overview-text p {
+    margin: 0 0 0.65rem;
+  }
+  .intel-pane p:last-child,
+  #overview-text p:last-child {
+    margin-bottom: 0;
+  }
+  .intel-pane a,
+  #overview-text a {
+    color: var(--accent);
   }
   @media (max-width: 720px) {
     .map-row { flex-direction: column; }
@@ -256,7 +271,7 @@
 
       <div class="overview-panel">
         <h2>🧠 Overview</h2>
-        <p id="overview-text" class="meta">Waiting for your location…</p>
+        <div id="overview-text" class="meta">Waiting for your location…</div>
       </div>
 
       <br>
@@ -401,9 +416,9 @@
   function initMap(lat, lon) {
     if (leafletMap) return;
 
-    leafletMap = L.map(mapEl).setView([lat, lon], 13);
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
-      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
+    leafletMap = L.map(mapEl).setView([lat, lon], 16);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
       maxZoom: 19
     }).addTo(leafletMap);
     L.marker([lat, lon]).addTo(leafletMap);
@@ -424,6 +439,45 @@
     });
   }
 
+  // Renders AI-generated text as readable paragraphs with clickable links, without
+  // ever treating the model's output as HTML — it flows from live web search results
+  // through an LLM (an untrusted-content pipeline), so everything here is built via
+  // DOM APIs / textContent, never innerHTML with interpolated model text. Only
+  // http(s) URLs from markdown-style [label](url) links become real <a> elements.
+  const MARKDOWN_LINK = /\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g;
+
+  function appendWithLinks(parent, line) {
+    let lastIndex = 0;
+    let match;
+    MARKDOWN_LINK.lastIndex = 0;
+    while ((match = MARKDOWN_LINK.exec(line)) !== null) {
+      if (match.index > lastIndex) {
+        parent.appendChild(document.createTextNode(line.slice(lastIndex, match.index)));
+      }
+      const a = document.createElement('a');
+      a.href = match[2];
+      a.textContent = match[1];
+      a.target = '_blank';
+      a.rel = 'noopener noreferrer';
+      parent.appendChild(a);
+      lastIndex = match.index + match[0].length;
+    }
+    if (lastIndex < line.length) {
+      parent.appendChild(document.createTextNode(line.slice(lastIndex)));
+    }
+  }
+
+  function renderModelText(container, text) {
+    container.innerHTML = '';
+    const lines = text.split('\n').map((l) => l.trim()).filter(Boolean);
+    lines.forEach((line) => {
+      const p = document.createElement('p');
+      const bullet = line.match(/^[-*]\s+(.*)/);
+      appendWithLinks(p, bullet ? `• ${bullet[1]}` : line);
+      container.appendChild(p);
+    });
+  }
+
   async function fetchIntel(category, lat, lon) {
     const res = await fetch(`${API_BASE}/ai/${category}?lat=${lat}&lon=${lon}`);
     if (!res.ok) throw new Error('Failed to load');
@@ -436,10 +490,7 @@
     pane.innerHTML = '<p class="meta">Loading…</p>';
     try {
       const text = await fetchIntel(category, lat, lon);
-      pane.innerHTML = '';
-      const p = document.createElement('p');
-      p.textContent = text; // model output — never innerHTML this
-      pane.appendChild(p);
+      renderModelText(pane, text);
     } catch {
       pane.innerHTML = '<p class="error">Could not load this right now.</p>';
     }
@@ -452,7 +503,7 @@
     try {
       const text = await fetchIntel('overview', lat, lon);
       el.className = '';
-      el.textContent = text; // model output — never innerHTML this
+      renderModelText(el, text);
     } catch {
       el.className = 'error';
       el.textContent = 'Could not load this right now.';

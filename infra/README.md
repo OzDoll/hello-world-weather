@@ -17,11 +17,24 @@ Bicep templates for the Azure resources behind `hello-world-weather`'s backend (
 | Cosmos SQL container | `AiCache` | Partition key `/locationKey`, default TTL 1,200s (20 min). Caches AI-generated News/Traffic/Events/Overview summaries by rounded location so repeat visitors near the same spot get a fast, free cache hit instead of a fresh (slow, paid) generation — see `api/src/lib/cache.js`. |
 | Azure Maps account | `hello-world-weather-maps` | Kind `Gen2`, SKU `G2`, `disableLocalAuth: true` (Managed Identity only). **Global resource** — `location: 'global'`, not region-pinned. Backs the Traffic AI feature (`api/src/lib/mapsClient.js`). |
 
-### Azure Maps RBAC is Bicep-native (unlike the OpenAI grant above)
+### Azure Maps RBAC is CLI-managed, like the OpenAI grant below — despite being same-resource-group
 
-`modules/maps.bicep` defines both the Maps account *and* its `Azure Maps Data Reader` role assignment (granted to the Function App's managed identity) in the same template — deliberately different from the OpenAI role grant below, which stays CLI-only. Reasoning: this resource lives inside `hello-world-weather-rg` (no cross-scope plumbing needed), and role assignments don't carry the appSettings-class risk (a full-replace can't wipe unrelated state the way it did for `WEBSITE_RUN_FROM_PACKAGE` — each assignment is its own independent, uniquely-named resource). A new resource with zero live traffic also has nothing to break on a first attempt.
+First attempt put the `Azure Maps Data Reader` role assignment (Function App identity → the Maps account) natively in `modules/maps.bicep`, reasoning that same-resource-group role assignments don't carry the appSettings-class risk (no full-replace, nothing to wipe) and a brand-new resource has no live traffic to break. That reasoning about *risk* was right but missed a different axis entirely: **the permissions of the identity doing the deploying.** Applying it manually (an Owner-level session) worked fine; the exact same template failed in CI with:
+```
+Authorization failed ... does not have permission to perform action 'Microsoft.Authorization/roleAssignments/write'
+```
+`hello-world-weather-infra-deploy` (the CI OIDC identity) only has `Contributor` on this resource group — and `Contributor` **deliberately excludes** `Microsoft.Authorization/roleAssignments/write`. This is a real Azure RBAC guardrail (Contributor can manage resources but can't grant access to them, to prevent privilege escalation), not a bug or an oversight in the role assignment. Widening CI's permissions to fix it would undercut the whole reason it's scoped to `Contributor` in the first place, so the role assignment moved back out of Bicep and is CLI-managed instead — same pattern as the OpenAI grant. `modules/maps.bicep` now only owns the Maps account's existence/shape. If the grant is ever lost:
+```bash
+MSYS_NO_PATHCONV=1 az role assignment create \
+  --assignee-object-id <functionApp-principalId-from-`az functionapp identity show`> \
+  --assignee-principal-type ServicePrincipal \
+  --role "Azure Maps Data Reader" \
+  --scope "/subscriptions/<sub>/resourceGroups/hello-world-weather-rg/providers/Microsoft.Maps/accounts/hello-world-weather-maps"
+```
 
-**Gotcha hit doing this:** the Maps account and role assignment were first created live via `az` (same "prove the novel resource works, then codify" approach used for Cosmos DB), *then* matching Bicep was written. Applying that Bicep failed with `RoleAssignmentExists` — Bicep's `guid()` function computes a deterministic assignment name from `(scope, principalId, roleDefinitionId)`, but `az role assignment create` had already created an assignment for that exact same triple under a *different*, randomly-generated name. Azure enforces uniqueness on the principal+role+scope triple, not the assignment resource's own name, so the two collided despite having different IDs. Fix: `az role assignment delete` the hand-created one, then re-run `az deployment group create` so Bicep creates its own — don't try to make the names match, just let one owner (Bicep) hold it going forward.
+**Earlier gotcha, still relevant if this is ever retried:** the Maps account and role assignment were first created live via `az` (same "prove the novel resource works, then codify" approach used for Cosmos DB) before Bicep existed for either. Bicep's `guid()`-named role assignment then collided with the hand-created one (`RoleAssignmentExists`) — Azure enforces uniqueness on the principal+role+scope triple, not the assignment resource's own name, so two assignments for the same triple under different names still collide. Had to `az role assignment delete` the hand-created one first. Moot now that the assignment lives outside Bicep entirely, but the same trap applies to any future CLI-then-Bicep resource.
+
+**Lesson for next time:** "is this safe to put in Bicep" needs two separate checks — whether the *resource type* carries replace-vs-merge risk (the appSettings lesson), and separately whether the *CI identity* actually has the ARM permission the resource type requires (this one). Both matter independently; passing one doesn't imply the other.
 
 ### AI features depend on a resource this template does not own
 
