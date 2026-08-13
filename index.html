@@ -526,6 +526,13 @@
       maxZoom: 19
     }).addTo(leafletMap);
     L.marker([lat, lon]).addTo(leafletMap);
+
+    const trafficLayer = L.tileLayer(`${API_BASE}/maps/traffic-flow-tile/{z}/{x}/{y}`, {
+      maxZoom: 18,
+      opacity: 0.7
+    }).addTo(leafletMap);
+    L.control.layers(null, { 'Traffic': trafficLayer }).addTo(leafletMap);
+
     setTimeout(() => leafletMap.invalidateSize(), 0);
   }
 

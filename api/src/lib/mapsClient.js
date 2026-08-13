@@ -42,4 +42,22 @@ async function getTrafficIncidents(lat, lon) {
   }));
 }
 
-module.exports = { getTrafficIncidents };
+async function getTrafficFlowTile(z, x, y) {
+  const token = await getTokenProvider()();
+  const url = `https://atlas.microsoft.com/traffic/flow/tile/png?api-version=1.0&style=absolute&zoom=${z}&x=${x}&y=${y}&thickness=10`;
+
+  const res = await fetch(url, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'x-ms-client-id': process.env.AZURE_MAPS_CLIENT_ID
+    }
+  });
+
+  if (!res.ok) {
+    throw new Error(`Azure Maps tile request failed: ${res.status}`);
+  }
+
+  return Buffer.from(await res.arrayBuffer());
+}
+
+module.exports = { getTrafficIncidents, getTrafficFlowTile };

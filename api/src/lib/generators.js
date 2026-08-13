@@ -4,7 +4,7 @@ const { getTrafficIncidents } = require('./mapsClient');
 async function generateNews(lat, lon, lang) {
   const response = await getResponsesClient().responses.create({
     model: process.env.AZURE_OPENAI_DEPLOYMENT,
-    input: `Search the web for notable local news within about 5km of latitude ${lat}, longitude ${lon}, from the last 24-48 hours. Write a concise 2-4 sentence summary for a general audience, mentioning specific stories where possible. If nothing notable is found, say so briefly rather than inventing anything. Respond in ${lang}.`,
+    input: `Search the web for notable local news within about 5km of latitude ${lat}, longitude ${lon}, from the last 24-48 hours. Format your response as a bulleted list: one item per line, each starting with "- ". Keep each bullet to one sentence, mentioning specific stories where possible. If nothing notable is found, say so briefly rather than inventing anything. Respond in ${lang}.`,
     tools: [{ type: 'web_search' }]
   });
   return response.output_text || 'No notable news found nearby right now.';
@@ -13,7 +13,7 @@ async function generateNews(lat, lon, lang) {
 async function generateEvents(lat, lon, lang) {
   const response = await getResponsesClient().responses.create({
     model: process.env.AZURE_OPENAI_DEPLOYMENT,
-    input: `Search the web for notable upcoming local events (this week) within about 5km of latitude ${lat}, longitude ${lon} — concerts, markets, festivals, sports, community events. Write a concise 2-4 sentence summary for a general audience, mentioning specific events where possible. If nothing notable is found, say so briefly rather than inventing anything. Respond in ${lang}.`,
+    input: `Search the web for notable upcoming local events (this week) within about 5km of latitude ${lat}, longitude ${lon} — concerts, markets, festivals, sports, community events. Format your response as a bulleted list: one item per line, each starting with "- ". Keep each bullet to one sentence, mentioning specific events where possible. If nothing notable is found, say so briefly rather than inventing anything. Respond in ${lang}.`,
     tools: [{ type: 'web_search' }]
   });
   return response.output_text || 'No notable events found nearby right now.';
@@ -31,7 +31,7 @@ async function generateTraffic(lat, lon, lang) {
     messages: [
       {
         role: 'user',
-        content: `Summarize these real-time traffic incidents for a general audience in 2-4 sentences, prioritizing the most severe/impactful ones. Respond in ${lang}. Data:\n\n${JSON.stringify(incidents)}`
+        content: `Summarize these real-time traffic incidents for a general audience, prioritizing the most severe/impactful ones. Format your response as a bulleted list: one item per line, each starting with "- ". Keep each bullet to one sentence. Respond in ${lang}. Data:\n\n${JSON.stringify(incidents)}`
       }
     ],
     max_completion_tokens: 1000,
