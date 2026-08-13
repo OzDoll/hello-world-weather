@@ -6,7 +6,7 @@ Is a location aware app. On load, it geolocates the user and shows current weath
 
 ## Stack
 
-**Frontend** — `index.html`, single static file, no build step, no framework. Deployed via GitHub Pages (auto-rebuilds on push to `main`).
+**Frontend** - `index.html`, single static file, no build step, no framework. Deployed via GitHub Pages (auto-rebuilds on push to `main`).
 
 **Backend** - `api/`, Azure Functions (Node.js v4 programming model). Deployed via GitHub Actions on push to `api/**`.
 
