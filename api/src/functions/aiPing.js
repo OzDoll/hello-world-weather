@@ -1,21 +1,5 @@
 const { app } = require('@azure/functions');
-const { AzureOpenAI } = require('openai');
-const { DefaultAzureCredential, getBearerTokenProvider } = require('@azure/identity');
-
-let client;
-function getClient() {
-  if (!client) {
-    const credential = new DefaultAzureCredential();
-    const azureADTokenProvider = getBearerTokenProvider(credential, 'https://cognitiveservices.azure.com/.default');
-    client = new AzureOpenAI({
-      endpoint: process.env.AZURE_OPENAI_ENDPOINT,
-      azureADTokenProvider,
-      deployment: process.env.AZURE_OPENAI_DEPLOYMENT,
-      apiVersion: '2024-10-21'
-    });
-  }
-  return client;
-}
+const { getAiClient } = require('../lib/aiClient');
 
 app.http('aiPing', {
   methods: ['GET'],
@@ -23,7 +7,7 @@ app.http('aiPing', {
   route: 'ai/ping',
   handler: async (request, context) => {
     try {
-      const response = await getClient().chat.completions.create({
+      const response = await getAiClient().chat.completions.create({
         model: process.env.AZURE_OPENAI_DEPLOYMENT,
         messages: [
           { role: 'user', content: 'Reply with exactly: "connection ok".' }

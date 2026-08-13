@@ -10,6 +10,6 @@
     "@azure/cosmos": "^4.1.1",
     "@azure/functions": "^4.5.1",
     "@azure/identity": "^4.4.1",
-    "openai": "^4.56.0"
+    "openai": "^7.4.0"
   }
 }

@@ -64,4 +64,22 @@ resource container 'Microsoft.DocumentDB/databaseAccounts/sqlDatabases/container
   }
 }
 
+@description('Cache container for AI-generated summaries, keyed by locationKey so all categories for one location share a partition.')
+resource aiCacheContainer 'Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers@2024-05-15' = {
+  parent: database
+  name: 'AiCache'
+  properties: {
+    resource: {
+      id: 'AiCache'
+      partitionKey: {
+        paths: [
+          '/locationKey'
+        ]
+        kind: 'Hash'
+      }
+      defaultTtl: 1200
+    }
+  }
+}
+
 output accountName string = cosmosAccount.name

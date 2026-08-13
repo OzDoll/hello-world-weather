@@ -242,13 +242,13 @@
           </div>
           <div class="intel-panes">
             <div class="intel-pane active" data-pane="news">
-              <p class="meta">AI-summarized news within 5km of you — coming soon.</p>
+              <p class="meta">Waiting for your location…</p>
             </div>
             <div class="intel-pane" data-pane="traffic">
-              <p class="meta">AI-summarized traffic within 5km of you — coming soon.</p>
+              <p class="meta">Waiting for your location…</p>
             </div>
             <div class="intel-pane" data-pane="events">
-              <p class="meta">AI-summarized events within 5km of you — coming soon.</p>
+              <p class="meta">Waiting for your location…</p>
             </div>
           </div>
         </div>
@@ -256,7 +256,7 @@
 
       <div class="overview-panel">
         <h2>🧠 Overview</h2>
-        <p class="meta">An AI-generated summary combining News, Traffic, and Events within 5km — coming soon.</p>
+        <p id="overview-text" class="meta">Waiting for your location…</p>
       </div>
 
       <br>
@@ -389,6 +389,7 @@
 
         initMap(latitude, longitude);
         saveLogEntry(lastReading);
+        loadIntel(latitude, longitude);
       } catch (err) {
         result.innerHTML = `<p class="error">${err.message}</p>`;
       }
@@ -401,8 +402,8 @@
     if (leafletMap) return;
 
     leafletMap = L.map(mapEl).setView([lat, lon], 13);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
       maxZoom: 19
     }).addTo(leafletMap);
     L.marker([lat, lon]).addTo(leafletMap);
@@ -421,6 +422,46 @@
         document.querySelector(`.intel-pane[data-pane="${tab.dataset.tab}"]`).classList.add('active');
       });
     });
+  }
+
+  async function fetchIntel(category, lat, lon) {
+    const res = await fetch(`${API_BASE}/ai/${category}?lat=${lat}&lon=${lon}`);
+    if (!res.ok) throw new Error('Failed to load');
+    const data = await res.json();
+    return data.text;
+  }
+
+  async function loadIntelPane(category, lat, lon) {
+    const pane = document.querySelector(`.intel-pane[data-pane="${category}"]`);
+    pane.innerHTML = '<p class="meta">Loading…</p>';
+    try {
+      const text = await fetchIntel(category, lat, lon);
+      pane.innerHTML = '';
+      const p = document.createElement('p');
+      p.textContent = text; // model output — never innerHTML this
+      pane.appendChild(p);
+    } catch {
+      pane.innerHTML = '<p class="error">Could not load this right now.</p>';
+    }
+  }
+
+  async function loadOverview(lat, lon) {
+    const el = document.getElementById('overview-text');
+    el.className = 'meta';
+    el.textContent = 'Loading…';
+    try {
+      const text = await fetchIntel('overview', lat, lon);
+      el.className = '';
+      el.textContent = text; // model output — never innerHTML this
+    } catch {
+      el.className = 'error';
+      el.textContent = 'Could not load this right now.';
+    }
+  }
+
+  function loadIntel(lat, lon) {
+    ['news', 'traffic', 'events'].forEach((category) => loadIntelPane(category, lat, lon));
+    loadOverview(lat, lon);
   }
 
   function saveLogEntry(reading) {

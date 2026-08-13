@@ -14,6 +14,14 @@ Bicep templates for the Azure resources behind `hello-world-weather`'s backend (
 | Cosmos DB account | `hello-world-weather-cosmos` | Free tier, Session consistency. **Data region is Sweden Central**, not West Europe like everything else — see below. |
 | Cosmos SQL database | `WeatherApp` | — |
 | Cosmos SQL container | `Log` | Partition key `/id`, default TTL 2,592,000s (30 days) so entries self-prune. |
+| Cosmos SQL container | `AiCache` | Partition key `/locationKey`, default TTL 1,200s (20 min). Caches AI-generated News/Traffic/Events/Overview summaries by rounded location so repeat visitors near the same spot get a fast, free cache hit instead of a fresh (slow, paid) generation — see `api/src/lib/cache.js`. |
+| Azure Maps account | `hello-world-weather-maps` | Kind `Gen2`, SKU `G2`, `disableLocalAuth: true` (Managed Identity only). **Global resource** — `location: 'global'`, not region-pinned. Backs the Traffic AI feature (`api/src/lib/mapsClient.js`). |
+
+### Azure Maps RBAC is Bicep-native (unlike the OpenAI grant above)
+
+`modules/maps.bicep` defines both the Maps account *and* its `Azure Maps Data Reader` role assignment (granted to the Function App's managed identity) in the same template — deliberately different from the OpenAI role grant below, which stays CLI-only. Reasoning: this resource lives inside `hello-world-weather-rg` (no cross-scope plumbing needed), and role assignments don't carry the appSettings-class risk (a full-replace can't wipe unrelated state the way it did for `WEBSITE_RUN_FROM_PACKAGE` — each assignment is its own independent, uniquely-named resource). A new resource with zero live traffic also has nothing to break on a first attempt.
+
+**Gotcha hit doing this:** the Maps account and role assignment were first created live via `az` (same "prove the novel resource works, then codify" approach used for Cosmos DB), *then* matching Bicep was written. Applying that Bicep failed with `RoleAssignmentExists` — Bicep's `guid()` function computes a deterministic assignment name from `(scope, principalId, roleDefinitionId)`, but `az role assignment create` had already created an assignment for that exact same triple under a *different*, randomly-generated name. Azure enforces uniqueness on the principal+role+scope triple, not the assignment resource's own name, so the two collided despite having different IDs. Fix: `az role assignment delete` the hand-created one, then re-run `az deployment group create` so Bicep creates its own — don't try to make the names match, just let one owner (Bicep) hold it going forward.
 
 ### AI features depend on a resource this template does not own
 
@@ -57,7 +65,7 @@ az functionapp config appsettings set \
   --settings COSMOS_CONNECTION_STRING="$(az cosmosdb keys list --name hello-world-weather-cosmos --resource-group hello-world-weather-rg --type connection-strings --query "connectionStrings[0].connectionString" -o tsv)"
 ```
 
-`az functionapp config appsettings set` only touches the keys you pass it — genuinely additive/merge-safe, unlike the ARM resource type — so it can't repeat this incident. Run it manually whenever the Cosmos key rotates or the account is recreated; there's no automated step for this yet (a candidate follow-up: add it as a post-deploy step in `deploy-infra.yml`, using the `az deployment group create` outputs for resource names rather than hardcoding them again).
+`az functionapp config appsettings set` only touches the keys you pass it — genuinely additive/merge-safe, unlike the ARM resource type — so it can't repeat this incident. Run it manually whenever the Cosmos key rotates or the account is recreated; there's no automated step for this yet (a candidate follow-up: add it as a post-deploy step in `deploy-infra.yml`, using the `az deployment group create` outputs for resource names rather than hardcoding them again). The same command sets the AI-related settings too — `AZURE_OPENAI_ENDPOINT`, `AZURE_OPENAI_DEPLOYMENT`, `AZURE_MAPS_CLIENT_ID` — all non-secret, no API keys anywhere in this backend (everything's Managed Identity).
 
 ### Not modeled: default alerting resources
 
@@ -96,8 +104,10 @@ az deployment group create \
 
 Always run `what-if` and read the diff before `create`. As of this writing, a clean run shows only cosmetic drift (Azure's own auto-populated defaults for indexing policy, TLS version, App Insights flow metadata, and the CORS block living in a separate `config/web` sub-resource that `what-if` can't correlate against the inline `siteConfig.cors` in this template) — no real resource creation/deletion.
 
-The Function App's *code* (the two functions in `../api`) deploys separately via `.github/workflows/deploy-api.yml` on push to `api/**` — this infra template only provisions the resources the code runs on top of, and redeploying it does not redeploy app code.
+The Function App's *code* (the seven functions in `../api`) deploys separately via `.github/workflows/deploy-api.yml` on push to `api/**` — this infra template only provisions the resources the code runs on top of, and redeploying it does not redeploy app code.
 
 ## Estimated cost
 
-Both the Function App (Consumption plan, 1M free executions/month) and Cosmos DB (free tier: first 1000 RU/s + 25GB storage free forever per account) are designed to stay entirely within Azure's free tiers for this workload. Application Insights has a free monthly data ingestion allowance too. Realistic ongoing cost for this app's traffic: effectively $0.
+The Function App (Consumption plan, 1M free executions/month), Cosmos DB (free tier: first 1000 RU/s + 25GB storage free forever per account), and Application Insights (free monthly ingestion allowance) all stay entirely within Azure's free tiers for this workload.
+
+**The AI features are not free**, unlike the rest of this app. GPT-5 chat completions/Responses calls and Grounding-with-Bing web search (used by News/Events) are billed per-token/per-call on `medirian-resource`, and Azure Maps Traffic API calls are billed per-transaction beyond its free tier — both outside this template's control since neither resource is provisioned here. The `AiCache` container (20-min TTL) exists specifically to bound how often these paid calls actually fire, since the endpoints that trigger them are necessarily anonymous/public (see `api/src/lib/cache.js`'s doc comment) — caching is the abuse/cost control here, not auth.

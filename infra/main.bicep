@@ -9,6 +9,7 @@ var planName = 'WestEuropePlan'
 var functionAppName = '${appName}-api'
 var appInsightsName = '${appName}-api'
 var cosmosAccountName = '${appName}-cosmos'
+var mapsAccountName = '${appName}-maps'
 
 module storage 'modules/storage.bicep' = {
   name: 'storage'
@@ -43,9 +44,19 @@ module functionApp 'modules/functionApp.bicep' = {
   }
 }
 
+module maps 'modules/maps.bicep' = {
+  name: 'maps'
+  params: {
+    mapsAccountName: mapsAccountName
+    readerPrincipalId: functionApp.outputs.principalId
+  }
+}
+
 output functionAppUrl string = 'https://${functionApp.outputs.defaultHostName}/api'
 output functionAppName string = functionApp.outputs.functionAppName
 output functionAppPrincipalId string = functionApp.outputs.principalId
 output storageAccountName string = storage.outputs.storageAccountName
 output cosmosAccountName string = cosmos.outputs.accountName
 output appInsightsName string = appInsightsName
+output mapsAccountName string = maps.outputs.accountName
+output mapsClientId string = maps.outputs.clientId
