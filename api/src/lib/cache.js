@@ -3,6 +3,8 @@ const { CosmosClient } = require('@azure/cosmos');
 const DATABASE_ID = 'WeatherApp';
 const CONTAINER_ID = 'AiCache';
 
+const SUPPORTED_LANGUAGES = ['English', 'Spanish', 'Portuguese', 'French', 'German', 'Italian'];
+
 let container;
 function getContainer() {
   if (!container) {
@@ -25,11 +27,20 @@ function parseLatLon(query) {
   return { lat, lon };
 }
 
-// Cache is keyed by locationKey (partition) + category, no item-level ttl needed —
-// the AiCache container's defaultTtl (1200s) applies automatically.
-async function getCachedOrGenerate(category, lat, lon, generatorFn) {
+// These endpoints are anonymous/public, so `lang` is attacker-controllable input that
+// flows directly into an LLM prompt — allow-list it rather than just defaulting when
+// absent, both to close the prompt-injection surface and to keep the cache from being
+// spammed with junk-language entries.
+function parseLang(query) {
+  const lang = query.get('lang');
+  return SUPPORTED_LANGUAGES.includes(lang) ? lang : 'English';
+}
+
+// Cache is keyed by locationKey (partition) + category + lang, no item-level ttl
+// needed — the AiCache container's defaultTtl (1200s) applies automatically.
+async function getCachedOrGenerate(category, lat, lon, lang, generatorFn) {
   const key = locationKey(lat, lon);
-  const id = `${category}:${key}`;
+  const id = `${category}:${key}:${lang}`;
 
   try {
     const { resource } = await getContainer().item(id, key).read();
@@ -46,6 +57,7 @@ async function getCachedOrGenerate(category, lat, lon, generatorFn) {
     id,
     locationKey: key,
     category,
+    lang,
     text,
     generatedAt: new Date().toISOString()
   });
@@ -53,4 +65,4 @@ async function getCachedOrGenerate(category, lat, lon, generatorFn) {
   return { text, cached: false };
 }
 
-module.exports = { getCachedOrGenerate, locationKey, parseLatLon };
+module.exports = { getCachedOrGenerate, locationKey, parseLatLon, parseLang, SUPPORTED_LANGUAGES };
