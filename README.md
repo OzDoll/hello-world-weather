@@ -1,6 +1,6 @@
 # I See You
 
-Is a location aware app. On load, it geolocates the user and shows current weather, hourly forecast, a live map with traffic, and AI enriched local news/traffic/events within a 5km radius of its location — all localized to the user's language based on their country and coordinates.
+Is a location aware app. On load, it geolocates the user and shows current weather, hourly forecast, a live map with traffic, and AI enriched local news/traffic/events within a 5km radius of its location - all localized to the user's language based on their country and coordinates.
 
 **Live at:** https://ozdoll.github.io/i-see-you/
 
