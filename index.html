@@ -350,6 +350,38 @@ async function fetchCity(lat, lon) {
   } catch { return { place: null, countryCode: null }; }
 }
 
+let clockTimezone = null;
+
+async function fetchWeather(lat, lon) {
+  const res = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current_weather=true&hourly=temperature_2m,weathercode&timezone=auto`);
+  return res.json();
+}
+
+function renderWeather(wx, lang) {
+  const cw = wx.current_weather;
+  const localTime = new Date(cw.time).toLocaleString(undefined, { weekday: 'short', hour: '2-digit', minute: '2-digit' });
+  $('temp').textContent = Math.round(cw.temperature);
+  $('condition').textContent = describe(cw.weathercode, lang);
+  $('local-time').textContent = localTime;
+  $('timezone').textContent = wx.timezone;
+  renderForecast(wx);
+  clockTimezone = wx.timezone;
+  return {
+    temperature: Math.round(cw.temperature), description: describe(cw.weathercode, lang),
+    wind: Math.round(cw.windspeed), timezone: wx.timezone, localTime
+  };
+}
+
+/* Ticks the displayed local time off the browser's own clock (converted to the
+   visitor's timezone), so it stays accurate between weather refreshes instead of
+   freezing at whatever current_weather.time said on the last fetch. */
+function tickClock() {
+  if (!clockTimezone) return;
+  $('local-time').textContent = new Date().toLocaleString(undefined, {
+    timeZone: clockTimezone, weekday: 'short', hour: '2-digit', minute: '2-digit'
+  });
+}
+
 async function load(lat, lon, demo) {
   $('lat').textContent = `${lat.toFixed(4)}° N`;
   $('lon').textContent = `${lon.toFixed(4)}° E`;
@@ -358,24 +390,13 @@ async function load(lat, lon, demo) {
 
   let lang = 'English';
   try {
-    const [wx, geo] = await Promise.all([
-      fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current_weather=true&hourly=temperature_2m,weathercode&timezone=auto`).then(r => r.json()),
-      fetchCity(lat, lon)
-    ]);
+    const [wx, geo] = await Promise.all([fetchWeather(lat, lon), fetchCity(lat, lon)]);
     lang = COUNTRY_LANGUAGE[geo.countryCode] || 'English';
-    const cw = wx.current_weather;
-    const localTime = new Date(cw.time).toLocaleString(undefined, { weekday: 'short', hour: '2-digit', minute: '2-digit' });
-    const reading = {
-      city: geo.place, latitude: lat, longitude: lon,
-      temperature: Math.round(cw.temperature), description: describe(cw.weathercode, lang),
-      wind: Math.round(cw.windspeed), timezone: wx.timezone, localTime
-    };
     $('place').textContent = geo.place || 'Unknown location';
-    $('temp').textContent = reading.temperature;
-    $('condition').textContent = reading.description;
-    $('local-time').textContent = localTime;
-    $('timezone').textContent = wx.timezone;
-    renderForecast(wx);
+    const reading = renderWeather(wx, lang);
+    reading.city = geo.place;
+    reading.latitude = lat;
+    reading.longitude = lon;
     if (!demo) {
       fetch(`${API_BASE}/log`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(reading)
@@ -385,6 +406,14 @@ async function load(lat, lon, demo) {
     $('condition').textContent = 'Conditions unavailable right now.';
   }
   ['news', 'traffic', 'events', 'overview'].forEach(c => loadPane(c, lat, lon, lang, demo));
+
+  // Clock ticks locally every 20s; weather + hourly forecast re-fetch every 5min.
+  // Neither re-runs geocoding/language detection (unchanging) or re-logs the visit
+  // (logging is a one-time-per-load event, not a heartbeat).
+  setInterval(tickClock, 20000);
+  setInterval(async () => {
+    try { renderWeather(await fetchWeather(lat, lon), lang); } catch {}
+  }, 5 * 60 * 1000);
 }
 
 async function loadPane(cat, lat, lon, lang, demo) {

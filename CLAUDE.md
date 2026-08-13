@@ -124,3 +124,52 @@ repo:OzDoll@82967682/i-see-you@1332474030:ref:refs/heads/main
 The credential was first created assuming the plain `repo:owner/repo:ref:...` format, which produced `AADSTS700213: No matching federated identity record found` on the very first workflow run. **Then, when this repo was renamed from `hello-world-weather` to `i-see-you`, it broke a second time** — initially assumed the ID-based format meant renames were safe (reasonable-looking guess, since the IDs *do* stay constant across a rename — confirmed same `82967682`/`1332474030` before and after), but the name portion of the subject string updates to match the *current* repo name, so the old credential (with `hello-world-weather` baked into its stored subject) stopped matching immediately after the rename. Caught and fixed by proactively test-triggering the workflow (`gh workflow run ... --repo <new-slug>`) right after the rename rather than waiting for the next real push to discover it broken.
 
 **Takeaway that generalizes:** never assume a federated credential subject format from partial pattern-matching (e.g. "it has an ID, so it must be rename-safe") — always verify by reading the exact string from a live `azure/login` failure log (it prints `subject claim - ...` right before any mismatch error) and setting the credential to match that verbatim. And after any repo rename, proactively re-test every OIDC-authenticated workflow immediately rather than waiting to find out via a broken deploy.
+
+## Planned: agentic concierge endpoint
+
+A chat endpoint ("What should I do in Munich this evening?") where Claude
+orchestrates the existing services as tools instead of the frontend calling
+them in fixed order.
+
+**Shape:** one new Azure Function (e.g. `api/src/functions/concierge.js`)
+hosting a tool-use loop against the Claude API — define tools, execute the
+model's tool-use requests, feed results back until it returns a final
+answer. Alternatively the Claude Agent SDK manages the loop. Either way this
+is a *separate AI surface* from the two Azure OpenAI clients in
+`aiClient.js` — don't try to shoehorn it into `completeChat`, it has
+different streaming/tool semantics.
+
+**Tools to expose** — thin wrappers over what already exists, do NOT
+duplicate logic:
+- `get_weather(lat, lon, hours)` — Open-Meteo call currently made by the
+  frontend; needs a small server-side wrapper.
+- `get_events(lat, lon, lang)` / `get_news(lat, lon, lang)` — wrap the
+  generators in `src/lib/generators.js`.
+- `get_traffic(lat, lon)` — wrap `generateTraffic` (which already wraps
+  `mapsClient.js`).
+- `web_search` — optional; if added, treat results as untrusted (same
+  rule as everywhere: rendered via `textContent`, never `innerHTML`, and
+  keep search content out of the system prompt).
+
+**Constraints that carry over from the rest of this file:**
+- Caching: agent responses are goal+location+lang specific — the `AiCache`
+  key scheme (`category:locationKey:lang`) doesn't fit free-form goals.
+  Either skip caching for the concierge or cache per-tool results
+  (weather/traffic lookups) rather than final answers. The cost-abuse
+  concern from the cache notes applies *more* here, not less: an agent
+  loop multiplies paid calls per request — a per-IP rate limit or turn
+  cap on this endpoint is required, not optional.
+- Localization: the `lang` parameter is load-bearing exactly as in the
+  cache notes — pass it into the loop's system prompt, don't infer it
+  per-tool.
+- Auth stays Managed Identity / keyless where the tool wrappers touch
+  Azure services; the Claude API key (if native API rather than Foundry)
+  is the first real secret in this backend — app setting, never committed,
+  and note it as the exception to the README's "no API keys" claim.
+
+**Why this feature exists (for context when making tradeoffs):** it's the
+before/after demo of single-shot generation (dashboard: cached, cheap,
+predictable) vs agentic orchestration (concierge: flexible, costlier,
+slower). Preserving that contrast is the point — resist "optimizing" the
+dashboard endpoints into the agent loop. An eval harness for tool-selection
+quality hangs off this naturally; leave a seam for it.
