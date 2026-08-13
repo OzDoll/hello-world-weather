@@ -3,721 +3,504 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>I see you 🦄</title>
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<title>I see you</title>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Manrope:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <style>
-  :root {
-    color-scheme: light dark;
-    --bg: #f5f6fa;
-    --card: #ffffff;
-    --text: #1c1e21;
-    --muted: #6b7280;
-    --accent: #2563eb;
-    --accent-hover: #1d4ed8;
-  }
-  @media (prefers-color-scheme: dark) {
-    :root:not([data-theme="light"]) {
-      --bg: #111318;
-      --card: #1b1e26;
-      --text: #f2f3f5;
-      --muted: #9aa0ab;
-      --accent: #3b82f6;
-      --accent-hover: #60a5fa;
-    }
-  }
-  :root[data-theme="dark"] {
-    --bg: #111318;
-    --card: #1b1e26;
-    --text: #f2f3f5;
-    --muted: #9aa0ab;
-    --accent: #3b82f6;
-    --accent-hover: #60a5fa;
-  }
-  * { box-sizing: border-box; }
-  body {
-    margin: 0;
-    min-height: 100vh;
-    display: flex;
-    flex-direction: column;
-    background: var(--bg);
-    color: var(--text);
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-  }
-  .app-header {
-    position: sticky;
-    top: 0;
-    z-index: 20;
-    display: grid;
-    grid-template-columns: 1fr auto 1fr;
-    align-items: center;
-    gap: 1rem;
-    padding: 1rem 1.5rem;
-    background: var(--card);
-    box-shadow: 0 1px 3px rgba(0,0,0,0.08);
-  }
-  .app-header h1 {
-    font-size: 1.25rem;
-    font-weight: 600;
-    margin: 0;
-  }
-  #location-banner {
-    min-width: 0;
-    font-size: 1.25rem;
-    font-weight: 600;
-    text-align: center;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-  #theme-toggle {
-    justify-self: end;
-  }
-  .weather-banner {
-    width: min(96vw, 1280px);
-    margin: 2rem auto 0;
-    padding: 0.85rem 1.5rem;
-    background: var(--card);
-    border: 1px solid var(--muted);
-    border-radius: 12px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    flex-wrap: wrap;
-    gap: 0.5rem 1.25rem;
-    text-align: center;
-  }
-  .weather-banner .weather-temp {
-    font-size: 1.15rem;
-    font-weight: 600;
-  }
-  .weather-banner .divider {
-    color: var(--muted);
-  }
-  main {
-    flex: 1;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 2rem 1rem;
-  }
-  .card {
-    background: var(--card);
-    border-radius: 16px;
-    padding: 2.5rem;
-    width: min(96vw, 1280px);
-    text-align: center;
-    box-shadow: 0 10px 30px rgba(0,0,0,0.08);
-  }
-  button {
-    background: var(--accent);
-    color: white;
-    border: none;
-    border-radius: 10px;
-    padding: 0.85rem 1.5rem;
-    font-size: 1rem;
-    cursor: pointer;
-    transition: background 0.15s ease;
-  }
-  button:hover { background: var(--accent-hover); }
-  button:disabled { opacity: 0.6; cursor: default; }
+:root{
+  --bg:oklch(0.97 0.006 262);--surface:oklch(1 0 0);--surface-2:oklch(0.975 0.006 262);
+  --line:oklch(0.905 0.01 262);--text:oklch(0.24 0.02 265);--muted:oklch(0.56 0.018 265);
+  --accent:oklch(0.55 0.18 260);--accent-soft:oklch(0.95 0.035 260);--danger:oklch(0.55 0.19 25);
+  --shadow:0 1px 2px rgba(16,20,35,.05),0 12px 32px -12px rgba(16,20,35,.18);
+  --map-filter:saturate(0.86) contrast(0.96);
+}
+:root[data-theme="dark"]{
+  --bg:oklch(0.17 0.016 265);--surface:oklch(0.212 0.018 265);--surface-2:oklch(0.255 0.02 265);
+  --line:oklch(0.32 0.02 265);--text:oklch(0.96 0.006 265);--muted:oklch(0.7 0.016 265);
+  --accent:oklch(0.74 0.15 258);--accent-soft:oklch(0.3 0.06 260);--danger:oklch(0.68 0.17 25);
+  --shadow:0 1px 2px rgba(0,0,0,.4),0 18px 44px -16px rgba(0,0,0,.6);
+  --map-filter:invert(1) hue-rotate(180deg) brightness(0.92) contrast(0.9) saturate(0.7);
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{min-height:100vh;background:var(--bg);color:var(--text);font-family:Manrope,system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+a{color:var(--accent);text-decoration:none;border-bottom:1px solid color-mix(in oklch,var(--accent) 35%,transparent)}
+a:hover{color:var(--text);border-bottom-color:var(--text)}
+p{margin:0 0 .7em}
+@keyframes pulseDot{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.35;transform:scale(.75)}}
+@keyframes fadeUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
 
-  .meta {
-    color: var(--muted);
-    font-size: 0.9rem;
-    line-height: 1.5;
-  }
-  .error {
-    color: #dc2626;
-    font-size: 0.9rem;
-  }
-  .map-row {
-    display: flex;
-    gap: 1rem;
-    align-items: stretch;
-    text-align: left;
-  }
-  #map {
-    flex: 1 1 60%;
-    min-width: 0;
-    height: 420px;
-    border-radius: 12px;
-    overflow: hidden;
-  }
-  .intel-panel {
-    flex: 1 1 38%;
-    min-width: 240px;
-    height: 420px;
-    display: flex;
-    flex-direction: column;
-    border: 1px solid var(--muted);
-    border-radius: 12px;
-    overflow: hidden;
-  }
-  .intel-tabs {
-    display: flex;
-    border-bottom: 1px solid var(--muted);
-  }
-  .intel-tab {
-    flex: 1;
-    background: transparent;
-    color: var(--muted);
-    border: none;
-    border-radius: 0;
-    padding: 0.75rem 0.5rem;
-    font-size: 0.85rem;
-  }
-  .intel-tab:hover { background: transparent; opacity: 0.8; }
-  .intel-tab.active {
-    color: var(--accent);
-    font-weight: 600;
-    box-shadow: inset 0 -2px 0 var(--accent);
-  }
-  .intel-panes {
-    flex: 1;
-    overflow-y: auto;
-    padding: 1rem;
-  }
-  .intel-pane { display: none; }
-  .intel-pane.active { display: block; }
-  .overview-panel {
-    margin-top: 1.25rem;
-    text-align: left;
-    padding: 1.25rem;
-    border: 1px solid var(--muted);
-    border-radius: 12px;
-  }
-  .overview-panel h2 {
-    font-size: 1.05rem;
-    margin: 0 0 0.5rem;
-  }
-  #overview-text {
-    max-height: 200px;
-    overflow-y: auto;
-    padding-right: 0.25rem;
-  }
-  .intel-pane p,
-  #overview-text p {
-    margin: 0 0 0.65rem;
-  }
-  .intel-pane p:last-child,
-  #overview-text p:last-child {
-    margin-bottom: 0;
-  }
-  .intel-pane a,
-  #overview-text a {
-    color: var(--accent);
-  }
-  @media (max-width: 720px) {
-    .map-row { flex-direction: column; }
-    #map, .intel-panel { flex: none; width: 100%; }
-    .app-header { grid-template-columns: auto 1fr auto; padding: 1rem; gap: 0.5rem; }
-    .app-header h1 { font-size: 1.05rem; }
-    #location-banner { font-size: 0.8rem; }
-    .weather-banner { padding: 0.75rem 1rem; gap: 0.4rem 0.75rem; font-size: 0.85rem; }
-  }
-  #log-btn {
-    margin-top: 0.75rem;
-    background: transparent;
-    color: var(--accent);
-    border: 1px solid var(--accent);
-  }
-  #log-btn:hover { background: transparent; opacity: 0.8; }
-  #log-panel {
-    margin-top: 1.25rem;
-    text-align: left;
-    display: none;
-  }
-  #log-list {
-    max-height: 300px;
-    overflow-y: auto;
-    padding-right: 0.25rem;
-  }
-  .log-entry {
-    padding: 0.75rem 0;
-    border-bottom: 1px solid var(--muted);
-    font-size: 0.9rem;
-  }
-  .log-entry:last-child { border-bottom: none; }
-  .log-entry .log-time {
-    color: var(--muted);
-    font-size: 0.8rem;
-  }
-  .log-entry .log-city {
-    font-weight: 600;
-  }
-  #theme-toggle {
-    background: var(--bg);
-    color: var(--text);
-    border: 1px solid var(--muted);
-    border-radius: 50%;
-    width: 2.5rem;
-    height: 2.5rem;
-    font-size: 1.1rem;
-    line-height: 1;
-    padding: 0;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    flex-shrink: 0;
-  }
-  #theme-toggle:hover { background: var(--bg); opacity: 0.85; }
+/* left wordmark rail */
+.rail{position:fixed;left:0;top:67px;bottom:0;width:62px;z-index:40;display:flex;align-items:center;justify-content:center;background:transparent;pointer-events:none}
+.rail-inner{writing-mode:vertical-rl;transform:rotate(180deg);display:flex;align-items:center;gap:20px;height:100%;padding:24px 0}
+.rail-dot{width:7px;height:7px;border-radius:50%;background:var(--accent);animation:pulseDot 2.4s ease-in-out infinite;flex:none}
+.rail-line{width:1px;flex:1;background:linear-gradient(to bottom,transparent,var(--line) 12%,var(--line) 88%,transparent)}
+.rail-word{font-family:'Space Grotesk',sans-serif;font-weight:500;font-size:14px;letter-spacing:.5em;text-transform:uppercase;padding:12px 0;border-top:1px solid var(--text);border-bottom:1px solid var(--text);white-space:nowrap;flex:none}
+
+/* header */
+header{position:sticky;top:0;z-index:30;display:flex;align-items:center;gap:16px;padding:14px 28px 14px 90px;background:color-mix(in oklch,var(--surface) 82%,transparent);backdrop-filter:blur(14px);border-bottom:1px solid var(--line)}
+.chipwrap{flex:1;min-width:0;display:flex;justify-content:center}
+.chip{display:flex;align-items:center;gap:10px;max-width:100%;padding:6px 14px;border:1px solid var(--line);border-radius:999px;background:var(--surface-2)}
+.label{font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);flex:none}
+.chip-place{font-weight:600;font-size:13.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#theme-toggle{flex:none;width:38px;height:38px;border-radius:12px;border:1px solid var(--line);background:var(--surface-2);color:var(--text);font-size:15px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:.15s}
+#theme-toggle:hover{background:var(--accent-soft);border-color:var(--accent)}
+
+main{max-width:1280px;margin:0 auto;padding:18px 28px 44px 90px;display:flex;flex-direction:column;gap:14px}
+
+.stats{display:grid;grid-template-columns:minmax(230px,1fr) 1.8fr;gap:14px;align-items:stretch}
+.now{position:relative;overflow:hidden;padding:12px 16px;border:1px solid var(--line);border-radius:14px;background:linear-gradient(120deg,var(--accent-soft),var(--surface) 70%);box-shadow:var(--shadow);display:flex;align-items:center;gap:14px}
+.now-temp{display:flex;align-items:flex-end;gap:3px;flex:none}
+.now-temp b{font-family:'Space Grotesk',sans-serif;font-weight:600;font-size:34px;line-height:1;letter-spacing:-.04em}
+.now-temp span{font-family:'Space Grotesk',sans-serif;font-weight:500;font-size:14px;color:var(--muted);padding-bottom:4px}
+.now-cond{font-size:13.5px;font-weight:600;line-height:1.3;text-wrap:pretty}
+.now-src{font-family:'IBM Plex Mono',monospace;font-size:9.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin-top:3px}
+.tiles{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+.tile{padding:12px 16px;border:1px solid var(--line);border-radius:14px;background:var(--surface);box-shadow:var(--shadow);display:flex;flex-direction:column;justify-content:center;gap:2px}
+.tile-val{font-family:'Space Grotesk',sans-serif;font-weight:600;font-size:18px;letter-spacing:-.02em}
+.tile-sub{font-size:11.5px;color:var(--muted)}
+.mono{font-family:'IBM Plex Mono',monospace;font-weight:500;font-size:13.5px}
+.forecast-strip{display:flex;justify-content:space-between;gap:8px;padding-top:6px}
+.fh{display:flex;flex-direction:column;align-items:center;gap:4px;flex:none;min-width:40px}
+.fh-time{font-family:'IBM Plex Mono',monospace;font-size:10.5px;color:var(--muted)}
+.fh-emoji{font-size:17px;line-height:1}
+.fh-temp{font-family:'Space Grotesk',sans-serif;font-weight:600;font-size:14px;letter-spacing:-.02em}
+
+.grid{display:grid;grid-template-columns:1.55fr 1fr;gap:14px;align-items:stretch}
+/* height (not min-height) is what makes .intel-panes' overflow-y:auto actually
+   scroll instead of the whole card growing to fit AI-generated content. */
+.mapcard{position:relative;border:1px solid var(--line);border-radius:14px;overflow:hidden;background:var(--surface);box-shadow:var(--shadow);height:420px}
+#map{position:absolute;inset:0}
+.intel{display:flex;flex-direction:column;border:1px solid var(--line);border-radius:14px;background:var(--surface);box-shadow:var(--shadow);overflow:hidden;height:420px}
+.intel-tabs{display:flex;padding:6px;gap:4px;border-bottom:1px solid var(--line);background:var(--surface-2)}
+.intel-tab{flex:1;border:none;cursor:pointer;padding:10px 8px;border-radius:12px;font-family:Manrope,sans-serif;font-size:12.5px;font-weight:600;background:transparent;color:var(--muted);transition:.15s}
+.intel-tab.active{background:var(--surface);color:var(--accent)}
+.intel-panes{flex:1;overflow-y:auto;padding:20px 22px;font-size:14px;line-height:1.62}
+.intel-pane{display:none;animation:fadeUp .25s ease}
+.intel-pane.active{display:block}
+
+.overview{padding:16px 20px;border:1px solid var(--line);border-radius:14px;background:var(--surface);box-shadow:var(--shadow)}
+.overview-head{display:flex;align-items:baseline;gap:12px;margin-bottom:10px}
+.overview-head h2{margin:0;font-family:'Space Grotesk',sans-serif;font-size:17px;font-weight:600;letter-spacing:-.02em}
+#overview-text{height:200px;overflow-y:auto;font-size:14.5px;line-height:1.68}
+
+.admin{display:none;padding:12px 18px;border:1px dashed var(--line);border-radius:14px;background:var(--surface-2)}
+.admin-row{display:flex;align-items:center;justify-content:space-between;gap:16px}
+#log-btn{border:1px solid var(--accent);background:transparent;color:var(--accent);border-radius:10px;padding:8px 16px;font-family:Manrope,sans-serif;font-size:12.5px;font-weight:600;cursor:pointer;transition:.15s}
+#log-btn:hover{background:var(--accent-soft)}
+#log-list{display:none;margin-top:16px;max-height:320px;overflow-y:auto}
+.log-entry{display:grid;grid-template-columns:170px 1fr;gap:16px;padding:12px 0;border-bottom:1px solid var(--line);font-size:13px}
+.log-time{font-family:'IBM Plex Mono',monospace;font-size:11.5px;color:var(--muted)}
+.log-city{font-weight:600;margin-bottom:2px}
+.log-meta{color:var(--muted);font-size:12.5px}
+.muted{color:var(--muted);font-size:13.5px}
+.error{color:var(--danger);font-size:13px}
+.bullet{padding-left:14px;text-indent:-14px;break-inside:avoid}
+
+footer{position:fixed;left:0;right:0;bottom:0;z-index:35;display:flex;justify-content:center;padding:7px 0;pointer-events:none;background:linear-gradient(to top,var(--bg) 55%,transparent)}
+footer span{font-family:'IBM Plex Mono',monospace;font-size:8px;letter-spacing:.24em;text-transform:uppercase;color:var(--muted)}
+
+.leaflet-tile{filter:var(--map-filter)}
+.leaflet-container{background:var(--surface-2);font-family:Manrope,sans-serif}
+.leaflet-bar a,.leaflet-control-layers{background:var(--surface)!important;color:var(--text)!important;border-color:var(--line)!important;border-radius:10px!important}
+.leaflet-control-attribution{background:color-mix(in oklch,var(--surface) 80%,transparent)!important;color:var(--muted)!important;font-size:10px!important}
+
+@media (max-width:900px){
+  .rail{display:none}
+  header{padding:12px 16px}
+  main{padding:16px 16px 32px}
+  .stats,.grid{grid-template-columns:1fr}
+}
 </style>
 </head>
 <body>
-  <header class="app-header">
-    <h1>I see you ❤️</h1>
-    <span id="location-banner">Locating…</span>
-    <button id="theme-toggle" aria-label="Toggle dark mode" title="Toggle dark mode">🌙</button>
-  </header>
-  <div class="weather-banner" id="weather-banner">
-    <span class="meta">Locating you…</span>
+
+<div class="rail" aria-hidden="true">
+  <div class="rail-inner">
+    <span class="rail-dot"></span>
+    <span class="rail-line"></span>
+    <span class="rail-word">I&nbsp;See&nbsp;You</span>
+    <span class="rail-line"></span>
+    <span class="rail-dot"></span>
   </div>
-  <main>
-    <div class="card">
-      <div class="map-row">
-        <div id="map"></div>
-        <div class="intel-panel">
-          <div class="intel-tabs">
-            <button class="intel-tab active" data-tab="news">📰 News</button>
-            <button class="intel-tab" data-tab="traffic">🚦 Traffic</button>
-            <button class="intel-tab" data-tab="events">🎉 Events</button>
-          </div>
-          <div class="intel-panes">
-            <div class="intel-pane active" data-pane="news">
-              <p class="meta">Waiting for your location…</p>
-            </div>
-            <div class="intel-pane" data-pane="traffic">
-              <p class="meta">Waiting for your location…</p>
-            </div>
-            <div class="intel-pane" data-pane="events">
-              <p class="meta">Waiting for your location…</p>
-            </div>
-          </div>
-        </div>
-      </div>
+</div>
 
-      <div class="overview-panel">
-        <h2>🧠 Overview</h2>
-        <div id="overview-text" class="meta">Waiting for your location…</div>
-      </div>
+<header>
+  <div class="chipwrap">
+    <div class="chip">
+      <span class="label">Here you are</span>
+      <span class="chip-place" id="place">Munich, Germany</span>
+    </div>
+  </div>
+  <button id="theme-toggle" aria-label="Toggle dark mode" title="Toggle dark mode">☾</button>
+</header>
 
-      <br>
-      <button id="log-btn" hidden>🗂️ View log</button>
-      <div id="log-panel">
-        <div id="log-list"></div>
+<main>
+  <section class="stats">
+    <div class="now">
+      <div class="now-temp"><b id="temp">17</b><span id="unit">°C</span></div>
+      <div>
+        <div class="now-cond" id="condition">Klarer Himmel</div>
+        <div class="now-src" id="source">Demo location</div>
       </div>
     </div>
-  </main>
+    <div class="tiles">
+      <div class="tile">
+        <div class="forecast-strip" id="forecast-strip"></div>
+      </div>
+      <div class="tile">
+        <span class="label">Local time</span>
+        <div class="tile-val" id="local-time">Thu 04:45 AM</div>
+        <div class="tile-sub" id="timezone">Europe/Berlin</div>
+      </div>
+      <div class="tile">
+        <span class="label">Coordinates</span>
+        <div class="mono" id="lat">48.1374° N</div>
+        <div class="mono tile-sub" id="lon">11.5755° E</div>
+      </div>
+    </div>
+  </section>
+
+  <section class="grid">
+    <div class="mapcard"><div id="map"></div></div>
+    <div class="intel">
+      <div class="intel-tabs">
+        <button class="intel-tab active" data-tab="news">News</button>
+        <button class="intel-tab" data-tab="traffic">Traffic</button>
+        <button class="intel-tab" data-tab="events">Events</button>
+      </div>
+      <div class="intel-panes">
+        <div class="intel-pane active" data-pane="news"></div>
+        <div class="intel-pane" data-pane="traffic"></div>
+        <div class="intel-pane" data-pane="events"></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="overview">
+    <div class="overview-head">
+      <h2>Overview</h2>
+      <span class="label">Generated for your area</span>
+    </div>
+    <div id="overview-text"></div>
+  </section>
+
+  <section class="admin" id="admin">
+    <div class="admin-row">
+      <span class="label">Admin · visit log</span>
+      <button id="log-btn">View log</button>
+    </div>
+    <div id="log-list"></div>
+  </section>
+
+</main>
+
+<footer><span>Aus München, mit Liebe.</span></footer>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
-  const themeToggle = document.getElementById('theme-toggle');
-  const root = document.documentElement;
+const API_BASE = 'https://hello-world-weather-api.azurewebsites.net/api';
+const $ = (id) => document.getElementById(id);
 
-  function applyTheme(theme) {
-    if (theme) {
-      root.setAttribute('data-theme', theme);
-    } else {
-      root.removeAttribute('data-theme');
-    }
-    const isDark = theme
-      ? theme === 'dark'
-      : window.matchMedia('(prefers-color-scheme: dark)').matches;
-    themeToggle.textContent = isDark ? '☀️' : '🌙';
+/* ---------- theme ---------- */
+const root = document.documentElement;
+const themeToggle = $('theme-toggle');
+function applyTheme(theme) {
+  root.setAttribute('data-theme', theme);
+  themeToggle.textContent = theme === 'dark' ? '☀' : '☾';
+}
+const savedTheme = localStorage.getItem('theme');
+applyTheme(savedTheme || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'));
+themeToggle.addEventListener('click', () => {
+  const next = root.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+  localStorage.setItem('theme', next);
+  applyTheme(next);
+});
+
+/* ---------- localisation of generated content by visitor country ---------- */
+const COUNTRY_LANGUAGE = {
+  es:'Spanish',mx:'Spanish',co:'Spanish',ar:'Spanish',cl:'Spanish',pe:'Spanish',ve:'Spanish',
+  ec:'Spanish',gt:'Spanish',cu:'Spanish',bo:'Spanish',do:'Spanish',hn:'Spanish',py:'Spanish',
+  sv:'Spanish',ni:'Spanish',cr:'Spanish',pa:'Spanish',uy:'Spanish',gq:'Spanish',
+  br:'Portuguese',pt:'Portuguese',ao:'Portuguese',mz:'Portuguese',cv:'Portuguese',gw:'Portuguese',
+  st:'Portuguese',tl:'Portuguese',
+  fr:'French',sn:'French',ci:'French',ml:'French',ne:'French',bf:'French',tg:'French',bj:'French',
+  cd:'French',cg:'French',ga:'French',cm:'French',mc:'French',lu:'French',
+  de:'German',at:'German',li:'German',ch:'German',
+  it:'Italian',sm:'Italian',va:'Italian'
+};
+const WX = {
+  English:{0:'Clear sky',1:'Mainly clear',2:'Partly cloudy',3:'Overcast',45:'Fog',48:'Depositing rime fog',51:'Light drizzle',53:'Moderate drizzle',55:'Dense drizzle',61:'Slight rain',63:'Moderate rain',65:'Heavy rain',71:'Slight snow',73:'Moderate snow',75:'Heavy snow',80:'Rain showers',81:'Moderate rain showers',82:'Violent rain showers',95:'Thunderstorm',96:'Thunderstorm with hail',99:'Thunderstorm with heavy hail'},
+  Spanish:{0:'Cielo despejado',1:'Mayormente despejado',2:'Parcialmente nublado',3:'Nublado',45:'Niebla',48:'Niebla con escarcha',51:'Llovizna ligera',53:'Llovizna moderada',55:'Llovizna densa',61:'Lluvia ligera',63:'Lluvia moderada',65:'Lluvia fuerte',71:'Nieve ligera',73:'Nieve moderada',75:'Nieve fuerte',80:'Chubascos',81:'Chubascos moderados',82:'Chubascos violentos',95:'Tormenta eléctrica',96:'Tormenta con granizo',99:'Tormenta con granizo fuerte'},
+  Portuguese:{0:'Céu limpo',1:'Predominantemente limpo',2:'Parcialmente nublado',3:'Nublado',45:'Nevoeiro',48:'Nevoeiro com geada',51:'Chuvisco fraco',53:'Chuvisco moderado',55:'Chuvisco intenso',61:'Chuva fraca',63:'Chuva moderada',65:'Chuva forte',71:'Neve fraca',73:'Neve moderada',75:'Neve forte',80:'Pancadas de chuva',81:'Pancadas de chuva moderadas',82:'Pancadas de chuva violentas',95:'Trovoada',96:'Trovoada com granizo',99:'Trovoada com granizo forte'},
+  French:{0:'Ciel dégagé',1:'Généralement dégagé',2:'Partiellement nuageux',3:'Couvert',45:'Brouillard',48:'Brouillard givrant',51:'Bruine légère',53:'Bruine modérée',55:'Bruine dense',61:'Pluie légère',63:'Pluie modérée',65:'Forte pluie',71:'Neige légère',73:'Neige modérée',75:'Forte neige',80:'Averses de pluie',81:'Averses de pluie modérées',82:'Averses de pluie violentes',95:'Orage',96:'Orage avec grêle',99:'Orage avec grêle forte'},
+  German:{0:'Klarer Himmel',1:'Überwiegend klar',2:'Teilweise bewölkt',3:'Bedeckt',45:'Nebel',48:'Reifnebel',51:'Leichter Nieselregen',53:'Mäßiger Nieselregen',55:'Starker Nieselregen',61:'Leichter Regen',63:'Mäßiger Regen',65:'Starker Regen',71:'Leichter Schneefall',73:'Mäßiger Schneefall',75:'Starker Schneefall',80:'Regenschauer',81:'Mäßige Regenschauer',82:'Heftige Regenschauer',95:'Gewitter',96:'Gewitter mit Hagel',99:'Gewitter mit starkem Hagel'},
+  Italian:{0:'Cielo sereno',1:'Prevalentemente sereno',2:'Parzialmente nuvoloso',3:'Nuvoloso',45:'Nebbia',48:'Nebbia con brina',51:'Pioviggine leggera',53:'Pioviggine moderata',55:'Pioviggine intensa',61:'Pioggia leggera',63:'Pioggia moderata',65:'Pioggia forte',71:'Neve leggera',73:'Neve moderata',75:'Neve forte',80:'Rovesci di pioggia',81:'Rovesci di pioggia moderati',82:'Rovesci di pioggia violenti',95:'Temporale',96:'Temporale con grandine',99:'Temporale con grandine forte'}
+};
+function describe(code, lang) {
+  const dict = WX[lang] || WX.English;
+  return dict[code] || WX.English[code] || 'Unknown conditions';
+}
+function weatherEmoji(code) {
+  if (code === 0 || code === 1) return '☀️';
+  if (code === 2) return '⛅';
+  if (code === 3) return '☁️';
+  if (code === 45 || code === 48) return '🌫️';
+  if ([51, 53, 55].includes(code)) return '🌦️';
+  if ([61, 63, 65, 80, 81, 82].includes(code)) return '🌧️';
+  if ([71, 73, 75].includes(code)) return '❄️';
+  if ([95, 96, 99].includes(code)) return '⛈️';
+  return '·';
+}
+function renderForecast(wx) {
+  const el = $('forecast-strip');
+  el.innerHTML = '';
+  const times = wx.hourly?.time || [];
+  const temps = wx.hourly?.temperature_2m || [];
+  const codes = wx.hourly?.weathercode || [];
+  // Matching current_weather.time against hourly.time by exact string equality is
+  // fragile (format/seconds mismatches silently fail indexOf, defaulting to index 0
+  // — the start of the array, i.e. midnight, which is why this once showed 3/6/9 AM
+  // regardless of the real time). Compare actual timestamps instead.
+  const nowMs = new Date(wx.current_weather.time).getTime();
+  let idx = times.findLastIndex(t => new Date(t).getTime() <= nowMs);
+  if (idx === -1) idx = 0;
+  for (let step = 1; step <= 3; step++) {
+    const i = idx + step * 3;
+    if (i >= times.length) break;
+    const item = document.createElement('div');
+    item.className = 'fh';
+    const t = document.createElement('div');
+    t.className = 'fh-time';
+    t.textContent = new Date(times[i]).toLocaleTimeString(undefined, { hour: 'numeric' });
+    const e = document.createElement('div');
+    e.className = 'fh-emoji';
+    e.textContent = weatherEmoji(codes[i]);
+    const temp = document.createElement('div');
+    temp.className = 'fh-temp';
+    temp.textContent = `${Math.round(temps[i])}°`;
+    item.appendChild(t);
+    item.appendChild(e);
+    item.appendChild(temp);
+    el.appendChild(item);
   }
+}
 
-  const savedTheme = localStorage.getItem('theme');
-  applyTheme(savedTheme);
+/* Placeholder copy shown before the live briefing arrives (or if it fails while
+   running from a demo location). Delete DEMO + its uses for a clean-slate app. */
+const DEMO = {
+  news:'Sample feed — the live briefing loads once the app runs on its own domain.\n- City council approves the riverside pedestrian bridge, work starts in autumn.\n- Metro line 4 gets six extra late-night services on weekends.',
+  traffic:'Sample feed — live traffic conditions appear here.\n- Ring road is flowing freely in both directions.\n- Roadworks on the northern approach until Friday, expect 5–10 minutes delay.',
+  events:'Sample feed — nearby events appear here.\n- Open-air jazz in the old market square, Saturday 19:00.\n- Weekend farmers market along the quay, 08:00–14:00.',
+  overview:'Sample overview — a short, generated read on your surroundings appears here: the neighbourhood you are in, what it is known for, and what is worth a ten-minute walk.\nEnable location access to see the real briefing.'
+};
 
-  themeToggle.addEventListener('click', () => {
-    const currentlyDark = root.getAttribute('data-theme')
-      ? root.getAttribute('data-theme') === 'dark'
-      : window.matchMedia('(prefers-color-scheme: dark)').matches;
-    const next = currentlyDark ? 'light' : 'dark';
-    localStorage.setItem('theme', next);
-    applyTheme(next);
+/* ---------- safe rendering of model output ----------
+   Text flows from live web search through an LLM (untrusted content), so it is
+   never assigned as HTML. Only http(s) markdown links become real <a> elements. */
+const MARKDOWN_LINK = /\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g;
+
+function paneEl(cat) {
+  return cat === 'overview' ? $('overview-text') : document.querySelector(`.intel-pane[data-pane="${cat}"]`);
+}
+function appendWithLinks(parent, line) {
+  let last = 0, m;
+  MARKDOWN_LINK.lastIndex = 0;
+  while ((m = MARKDOWN_LINK.exec(line)) !== null) {
+    if (m.index > last) parent.appendChild(document.createTextNode(line.slice(last, m.index)));
+    const a = document.createElement('a');
+    a.href = m[2]; a.textContent = m[1]; a.target = '_blank'; a.rel = 'noopener noreferrer';
+    parent.appendChild(a);
+    last = m.index + m[0].length;
+  }
+  if (last < line.length) parent.appendChild(document.createTextNode(line.slice(last)));
+}
+function setPaneText(cat, text, cls) {
+  const el = paneEl(cat);
+  el.innerHTML = '';
+  const p = document.createElement('p');
+  p.className = cls || 'muted';
+  p.textContent = text;
+  el.appendChild(p);
+}
+function renderModelText(cat, text) {
+  const el = paneEl(cat);
+  el.innerHTML = '';
+  text.split('\n').map(l => l.trim()).filter(Boolean).forEach(line => {
+    const p = document.createElement('p');
+    const bullet = line.match(/^[-*]\s+(.*)/);
+    if (bullet) p.className = 'bullet';
+    appendWithLinks(p, bullet ? '— ' + bullet[1] : line);
+    el.appendChild(p);
   });
+}
 
-  const locationBanner = document.getElementById('location-banner');
-  const weatherBanner = document.getElementById('weather-banner');
-  const mapEl = document.getElementById('map');
-  const logBtn = document.getElementById('log-btn');
-  const logPanel = document.getElementById('log-panel');
-  const logList = document.getElementById('log-list');
-
-  const API_BASE = 'https://hello-world-weather-api.azurewebsites.net/api';
-  const isAdmin = new URLSearchParams(window.location.search).get('admin') === '1';
-  if (isAdmin) logBtn.hidden = false;
-
-  let adminKey = sessionStorage.getItem('weatherAdminKey') || null;
-
-  let leafletMap = null;
-  let lastReading = null;
-
-  // Country -> language mapping, used to localize AI content and weather text based
-  // on the visitor's physical location (from reverse geocoding), not browser
-  // settings. Multi-language countries (Belgium, Switzerland, Canada) are mapped to
-  // their plurality language among the ones we support, or left unmapped (-> English)
-  // when none of our languages is the plurality one.
-  const COUNTRY_LANGUAGE = {
-    es: 'Spanish', mx: 'Spanish', co: 'Spanish', ar: 'Spanish', cl: 'Spanish',
-    pe: 'Spanish', ve: 'Spanish', ec: 'Spanish', gt: 'Spanish', cu: 'Spanish',
-    bo: 'Spanish', do: 'Spanish', hn: 'Spanish', py: 'Spanish', sv: 'Spanish',
-    ni: 'Spanish', cr: 'Spanish', pa: 'Spanish', uy: 'Spanish', gq: 'Spanish',
-    br: 'Portuguese', pt: 'Portuguese', ao: 'Portuguese', mz: 'Portuguese',
-    cv: 'Portuguese', gw: 'Portuguese', st: 'Portuguese', tl: 'Portuguese',
-    fr: 'French', sn: 'French', ci: 'French', ml: 'French', ne: 'French',
-    bf: 'French', tg: 'French', bj: 'French', cd: 'French', cg: 'French',
-    ga: 'French', cm: 'French', mc: 'French', lu: 'French',
-    de: 'German', at: 'German', li: 'German', ch: 'German',
-    it: 'Italian', sm: 'Italian', va: 'Italian'
-  };
-
-  const weatherCodesEn = {
-    0: 'Clear sky', 1: 'Mainly clear', 2: 'Partly cloudy', 3: 'Overcast',
-    45: 'Fog', 48: 'Depositing rime fog',
-    51: 'Light drizzle', 53: 'Moderate drizzle', 55: 'Dense drizzle',
-    61: 'Slight rain', 63: 'Moderate rain', 65: 'Heavy rain',
-    71: 'Slight snow', 73: 'Moderate snow', 75: 'Heavy snow',
-    80: 'Rain showers', 81: 'Moderate rain showers', 82: 'Violent rain showers',
-    95: 'Thunderstorm', 96: 'Thunderstorm with hail', 99: 'Thunderstorm with heavy hail'
-  };
-  const weatherCodesEs = {
-    0: 'Cielo despejado', 1: 'Mayormente despejado', 2: 'Parcialmente nublado', 3: 'Nublado',
-    45: 'Niebla', 48: 'Niebla con escarcha',
-    51: 'Llovizna ligera', 53: 'Llovizna moderada', 55: 'Llovizna densa',
-    61: 'Lluvia ligera', 63: 'Lluvia moderada', 65: 'Lluvia fuerte',
-    71: 'Nieve ligera', 73: 'Nieve moderada', 75: 'Nieve fuerte',
-    80: 'Chubascos', 81: 'Chubascos moderados', 82: 'Chubascos violentos',
-    95: 'Tormenta eléctrica', 96: 'Tormenta con granizo', 99: 'Tormenta con granizo fuerte'
-  };
-  const weatherCodesPt = {
-    0: 'Céu limpo', 1: 'Predominantemente limpo', 2: 'Parcialmente nublado', 3: 'Nublado',
-    45: 'Nevoeiro', 48: 'Nevoeiro com geada',
-    51: 'Chuvisco fraco', 53: 'Chuvisco moderado', 55: 'Chuvisco intenso',
-    61: 'Chuva fraca', 63: 'Chuva moderada', 65: 'Chuva forte',
-    71: 'Neve fraca', 73: 'Neve moderada', 75: 'Neve forte',
-    80: 'Pancadas de chuva', 81: 'Pancadas de chuva moderadas', 82: 'Pancadas de chuva violentas',
-    95: 'Trovoada', 96: 'Trovoada com granizo', 99: 'Trovoada com granizo forte'
-  };
-  const weatherCodesFr = {
-    0: 'Ciel dégagé', 1: 'Généralement dégagé', 2: 'Partiellement nuageux', 3: 'Couvert',
-    45: 'Brouillard', 48: 'Brouillard givrant',
-    51: 'Bruine légère', 53: 'Bruine modérée', 55: 'Bruine dense',
-    61: 'Pluie légère', 63: 'Pluie modérée', 65: 'Forte pluie',
-    71: 'Neige légère', 73: 'Neige modérée', 75: 'Forte neige',
-    80: 'Averses de pluie', 81: 'Averses de pluie modérées', 82: 'Averses de pluie violentes',
-    95: 'Orage', 96: 'Orage avec grêle', 99: 'Orage avec grêle forte'
-  };
-  const weatherCodesDe = {
-    0: 'Klarer Himmel', 1: 'Überwiegend klar', 2: 'Teilweise bewölkt', 3: 'Bedeckt',
-    45: 'Nebel', 48: 'Reifnebel',
-    51: 'Leichter Nieselregen', 53: 'Mäßiger Nieselregen', 55: 'Starker Nieselregen',
-    61: 'Leichter Regen', 63: 'Mäßiger Regen', 65: 'Starker Regen',
-    71: 'Leichter Schneefall', 73: 'Mäßiger Schneefall', 75: 'Starker Schneefall',
-    80: 'Regenschauer', 81: 'Mäßige Regenschauer', 82: 'Heftige Regenschauer',
-    95: 'Gewitter', 96: 'Gewitter mit Hagel', 99: 'Gewitter mit starkem Hagel'
-  };
-  const weatherCodesIt = {
-    0: 'Cielo sereno', 1: 'Prevalentemente sereno', 2: 'Parzialmente nuvoloso', 3: 'Nuvoloso',
-    45: 'Nebbia', 48: 'Nebbia con brina',
-    51: 'Pioviggine leggera', 53: 'Pioviggine moderata', 55: 'Pioviggine intensa',
-    61: 'Pioggia leggera', 63: 'Pioggia moderata', 65: 'Pioggia forte',
-    71: 'Neve leggera', 73: 'Neve moderata', 75: 'Neve forte',
-    80: 'Rovesci di pioggia', 81: 'Rovesci di pioggia moderati', 82: 'Rovesci di pioggia violenti',
-    95: 'Temporale', 96: 'Temporale con grandine', 99: 'Temporale con grandine forte'
-  };
-  const WEATHER_DESCRIPTIONS = {
-    English: weatherCodesEn, Spanish: weatherCodesEs, Portuguese: weatherCodesPt,
-    French: weatherCodesFr, German: weatherCodesDe, Italian: weatherCodesIt
-  };
-
-  function describe(code, lang) {
-    const dict = WEATHER_DESCRIPTIONS[lang] || weatherCodesEn;
-    return dict[code] || weatherCodesEn[code] || 'Unknown conditions';
-  }
-
-  async function fetchWeather(lat, lon) {
-    const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current_weather=true&timezone=auto`;
-    const res = await fetch(url);
-    if (!res.ok) throw new Error('Weather request failed');
-    return res.json();
-  }
-
-  async function fetchCity(lat, lon) {
-    try {
-      const url = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lon}`;
-      const res = await fetch(url);
-      if (!res.ok) return { place: null, countryCode: null };
-      const data = await res.json();
-      const addr = data.address || {};
-      const place = addr.city || addr.town || addr.village || addr.county;
-      const countryCode = addr.country_code || null;
-      if (!place) return { place: null, countryCode };
-      return { place: addr.country ? `${place}, ${addr.country}` : place, countryCode };
-    } catch {
-      return { place: null, countryCode: null };
-    }
-  }
-
-  async function loadWeather() {
-    if (!navigator.geolocation) {
-      weatherBanner.innerHTML = '<span class="error">Geolocation is not supported by this browser.</span>';
-      return;
-    }
-
-    navigator.geolocation.getCurrentPosition(async (pos) => {
-      try {
-        const { latitude, longitude } = pos.coords;
-        const [data, geo] = await Promise.all([
-          fetchWeather(latitude, longitude),
-          fetchCity(latitude, longitude)
-        ]);
-        const cw = data.current_weather;
-        const city = geo.place;
-        const languageName = COUNTRY_LANGUAGE[geo.countryCode] || 'English';
-
-        const localTime = new Date(cw.time).toLocaleString(undefined, {
-          weekday: 'short', hour: '2-digit', minute: '2-digit'
-        });
-
-        lastReading = {
-          city,
-          latitude,
-          longitude,
-          temperature: Math.round(cw.temperature),
-          description: describe(cw.weathercode, languageName),
-          wind: Math.round(cw.windspeed),
-          timezone: data.timezone,
-          localTime
-        };
-
-        locationBanner.textContent = `You're in ${city || 'Unknown location'} (${latitude.toFixed(2)}, ${longitude.toFixed(2)})`;
-
-        weatherBanner.innerHTML = `
-          <span class="weather-temp">${Math.round(cw.temperature)}°C</span>
-          <span class="divider">·</span>
-          <span>${describe(cw.weathercode, languageName)}</span>
-          <span class="divider">|</span>
-          <span>🕒 ${localTime} (${data.timezone})</span>
-          <span class="divider">|</span>
-          <span>💨 ${Math.round(cw.windspeed)} km/h</span>
-        `;
-
-        initMap(latitude, longitude);
-        saveLogEntry(lastReading);
-        loadIntel(latitude, longitude, languageName);
-      } catch (err) {
-        weatherBanner.innerHTML = `<span class="error">${err.message}</span>`;
-      }
-    }, (err) => {
-      locationBanner.textContent = 'Location unavailable';
-      weatherBanner.innerHTML = `<span class="error">Location error: ${err.message}</span>`;
-    });
-  }
-
-  function initMap(lat, lon) {
-    if (leafletMap) return;
-
-    leafletMap = L.map(mapEl).setView([lat, lon], 17);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-      maxZoom: 19
-    }).addTo(leafletMap);
-    L.marker([lat, lon]).addTo(leafletMap);
-
-    const trafficLayer = L.tileLayer(`${API_BASE}/maps/traffic-flow-tile/{z}/{x}/{y}`, {
-      maxZoom: 18,
-      opacity: 0.4
-    }).addTo(leafletMap);
-    L.control.layers(null, { 'Traffic': trafficLayer }).addTo(leafletMap);
-
-    const CenterControl = L.Control.extend({
-      options: { position: 'topleft' },
-      onAdd: function () {
-        const container = L.DomUtil.create('div', 'leaflet-bar leaflet-control');
-        const button = L.DomUtil.create('a', '', container);
-        button.href = '#';
-        button.title = 'Center on my location';
-        button.innerHTML = '🎯';
-        button.style.display = 'flex';
-        button.style.alignItems = 'center';
-        button.style.justifyContent = 'center';
-        button.style.fontSize = '16px';
-        L.DomEvent.on(button, 'click', L.DomEvent.stop)
-          .on(button, 'click', () => leafletMap.setView([lat, lon], 17));
-        return container;
-      }
-    });
-    new CenterControl().addTo(leafletMap);
-
-    setTimeout(() => leafletMap.invalidateSize(), 0);
-  }
-
-  function initIntelTabs() {
-    const tabs = document.querySelectorAll('.intel-tab');
-    const panes = document.querySelectorAll('.intel-pane');
-
-    tabs.forEach(tab => {
-      tab.addEventListener('click', () => {
-        tabs.forEach(t => t.classList.remove('active'));
-        panes.forEach(p => p.classList.remove('active'));
-        tab.classList.add('active');
-        document.querySelector(`.intel-pane[data-pane="${tab.dataset.tab}"]`).classList.add('active');
-      });
-    });
-  }
-
-  // Renders AI-generated text as readable paragraphs with clickable links, without
-  // ever treating the model's output as HTML — it flows from live web search results
-  // through an LLM (an untrusted-content pipeline), so everything here is built via
-  // DOM APIs / textContent, never innerHTML with interpolated model text. Only
-  // http(s) URLs from markdown-style [label](url) links become real <a> elements.
-  const MARKDOWN_LINK = /\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g;
-
-  function appendWithLinks(parent, line) {
-    let lastIndex = 0;
-    let match;
-    MARKDOWN_LINK.lastIndex = 0;
-    while ((match = MARKDOWN_LINK.exec(line)) !== null) {
-      if (match.index > lastIndex) {
-        parent.appendChild(document.createTextNode(line.slice(lastIndex, match.index)));
-      }
-      const a = document.createElement('a');
-      a.href = match[2];
-      a.textContent = match[1];
-      a.target = '_blank';
-      a.rel = 'noopener noreferrer';
-      parent.appendChild(a);
-      lastIndex = match.index + match[0].length;
-    }
-    if (lastIndex < line.length) {
-      parent.appendChild(document.createTextNode(line.slice(lastIndex)));
-    }
-  }
-
-  function renderModelText(container, text) {
-    container.innerHTML = '';
-    const lines = text.split('\n').map((l) => l.trim()).filter(Boolean);
-    lines.forEach((line) => {
-      const p = document.createElement('p');
-      const bullet = line.match(/^[-*]\s+(.*)/);
-      appendWithLinks(p, bullet ? `• ${bullet[1]}` : line);
-      container.appendChild(p);
-    });
-  }
-
-  async function fetchIntel(category, lat, lon, lang) {
-    const res = await fetch(`${API_BASE}/ai/${category}?lat=${lat}&lon=${lon}&lang=${encodeURIComponent(lang)}`);
-    if (!res.ok) throw new Error('Failed to load');
+/* ---------- data ---------- */
+async function fetchCity(lat, lon) {
+  try {
+    const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lon}`);
+    if (!res.ok) return { place: null, countryCode: null };
     const data = await res.json();
-    return data.text;
-  }
+    const addr = data.address || {};
+    const place = addr.city || addr.town || addr.village || addr.county;
+    const countryCode = addr.country_code || null;
+    if (!place) return { place: null, countryCode };
+    return { place: addr.country ? `${place}, ${addr.country}` : place, countryCode };
+  } catch { return { place: null, countryCode: null }; }
+}
 
-  async function loadIntelPane(category, lat, lon, lang) {
-    const pane = document.querySelector(`.intel-pane[data-pane="${category}"]`);
-    pane.innerHTML = '<p class="meta">Loading…</p>';
-    try {
-      const text = await fetchIntel(category, lat, lon, lang);
-      renderModelText(pane, text);
-    } catch {
-      pane.innerHTML = '<p class="error">Could not load this right now.</p>';
+async function load(lat, lon, demo) {
+  $('lat').textContent = `${lat.toFixed(4)}° N`;
+  $('lon').textContent = `${lon.toFixed(4)}° E`;
+  $('source').textContent = demo ? 'Demo location' : 'Live · your device';
+  initMap(lat, lon);
+
+  let lang = 'English';
+  try {
+    const [wx, geo] = await Promise.all([
+      fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current_weather=true&hourly=temperature_2m,weathercode&timezone=auto`).then(r => r.json()),
+      fetchCity(lat, lon)
+    ]);
+    lang = COUNTRY_LANGUAGE[geo.countryCode] || 'English';
+    const cw = wx.current_weather;
+    const localTime = new Date(cw.time).toLocaleString(undefined, { weekday: 'short', hour: '2-digit', minute: '2-digit' });
+    const reading = {
+      city: geo.place, latitude: lat, longitude: lon,
+      temperature: Math.round(cw.temperature), description: describe(cw.weathercode, lang),
+      wind: Math.round(cw.windspeed), timezone: wx.timezone, localTime
+    };
+    $('place').textContent = geo.place || 'Unknown location';
+    $('temp').textContent = reading.temperature;
+    $('condition').textContent = reading.description;
+    $('local-time').textContent = localTime;
+    $('timezone').textContent = wx.timezone;
+    renderForecast(wx);
+    if (!demo) {
+      fetch(`${API_BASE}/log`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(reading)
+      }).catch(() => {});
     }
+  } catch {
+    $('condition').textContent = 'Conditions unavailable right now.';
   }
+  ['news', 'traffic', 'events', 'overview'].forEach(c => loadPane(c, lat, lon, lang, demo));
+}
 
-  async function loadOverview(lat, lon, lang) {
-    const el = document.getElementById('overview-text');
-    el.className = 'meta';
-    el.textContent = 'Loading…';
-    try {
-      const text = await fetchIntel('overview', lat, lon, lang);
-      el.className = '';
-      renderModelText(el, text);
-    } catch {
-      el.className = 'error';
-      el.textContent = 'Could not load this right now.';
+async function loadPane(cat, lat, lon, lang, demo) {
+  setPaneText(cat, 'Loading…');
+  try {
+    const res = await fetch(`${API_BASE}/ai/${cat}?lat=${lat}&lon=${lon}&lang=${encodeURIComponent(lang)}`);
+    if (!res.ok) throw new Error('failed');
+    const data = await res.json();
+    renderModelText(cat, data.text);
+  } catch {
+    if (demo) renderModelText(cat, DEMO[cat]);
+    else setPaneText(cat, 'Could not load this right now.', 'error');
+  }
+}
+
+/* ---------- map ---------- */
+let leafletMap = null;
+function initMap(lat, lon) {
+  if (leafletMap || !window.L) return;
+  leafletMap = L.map('map').setView([lat, lon], 16);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+    maxZoom: 19
+  }).addTo(leafletMap);
+  const icon = L.divIcon({
+    className: '', iconSize: [22, 22], iconAnchor: [11, 11],
+    html: '<div style="width:22px;height:22px;border-radius:50%;background:var(--accent);border:3px solid var(--surface);box-shadow:0 0 0 6px color-mix(in oklch,var(--accent) 25%,transparent)"></div>'
+  });
+  L.marker([lat, lon], { icon }).addTo(leafletMap);
+  const traffic = L.tileLayer(`${API_BASE}/maps/traffic-flow-tile/{z}/{x}/{y}`, { maxZoom: 18, opacity: 0.45 });
+  L.control.layers(null, { Traffic: traffic }).addTo(leafletMap);
+  const Recenter = L.Control.extend({
+    options: { position: 'topleft' },
+    onAdd: function () {
+      const c = L.DomUtil.create('div', 'leaflet-bar leaflet-control');
+      const b = L.DomUtil.create('a', '', c);
+      b.href = '#'; b.title = 'Center on my location'; b.textContent = '◎';
+      b.style.cssText = 'display:flex;align-items:center;justify-content:center;font-size:17px';
+      L.DomEvent.on(b, 'click', L.DomEvent.stop).on(b, 'click', () => leafletMap.setView([lat, lon], 16));
+      return c;
     }
-  }
+  });
+  new Recenter().addTo(leafletMap);
+  setTimeout(() => leafletMap.invalidateSize(), 60);
+}
 
-  function loadIntel(lat, lon, lang) {
-    ['news', 'traffic', 'events'].forEach((category) => loadIntelPane(category, lat, lon, lang));
-    loadOverview(lat, lon, lang);
-  }
+/* ---------- tabs ---------- */
+document.querySelectorAll('.intel-tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.intel-tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.intel-pane').forEach(p => p.classList.remove('active'));
+    tab.classList.add('active');
+    document.querySelector(`.intel-pane[data-pane="${tab.dataset.tab}"]`).classList.add('active');
+  });
+});
 
-  function saveLogEntry(reading) {
-    fetch(`${API_BASE}/log`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(reading)
-    }).catch(() => {});
-  }
+/* ---------- admin log ---------- */
+let adminKey = sessionStorage.getItem('weatherAdminKey') || null;
+const logList = $('log-list');
+if (new URLSearchParams(location.search).get('admin') === '1') $('admin').style.display = 'block';
 
-  async function fetchLog() {
-    let key = adminKey;
-    if (!key) {
-      key = prompt('Enter the admin key to view the log:');
-      if (!key) return null;
-    }
+$('log-btn').addEventListener('click', () => {
+  const showing = logList.style.display === 'block';
+  logList.style.display = showing ? 'none' : 'block';
+  $('log-btn').textContent = showing ? 'View log' : 'Hide log';
+  if (!showing) renderLog();
+});
 
-    const res = await fetch(`${API_BASE}/log`, {
-      headers: { 'x-functions-key': key }
-    });
-
+async function renderLog() {
+  logList.innerHTML = '<p class="muted">Loading…</p>';
+  const key = adminKey || prompt('Enter the admin key to view the log:');
+  if (!key) { logList.innerHTML = '<p class="muted">Admin key required.</p>'; return; }
+  let log;
+  try {
+    const res = await fetch(`${API_BASE}/log`, { headers: { 'x-functions-key': key } });
     if (res.status === 401 || res.status === 403) {
-      adminKey = null;
-      sessionStorage.removeItem('weatherAdminKey');
+      adminKey = null; sessionStorage.removeItem('weatherAdminKey');
       throw new Error('Invalid admin key.');
     }
     if (!res.ok) throw new Error('Failed to load log.');
-
-    adminKey = key;
-    sessionStorage.setItem('weatherAdminKey', key);
-    return res.json();
+    log = await res.json();
+    adminKey = key; sessionStorage.setItem('weatherAdminKey', key);
+  } catch (err) {
+    logList.innerHTML = '';
+    const p = document.createElement('p');
+    p.className = 'error'; p.textContent = err.message;
+    logList.appendChild(p);
+    return;
   }
+  logList.innerHTML = '';
+  if (!log.length) { logList.innerHTML = '<p class="muted">No entries yet.</p>'; return; }
+  log.forEach(e => {
+    const row = document.createElement('div');
+    row.className = 'log-entry';
+    const t = document.createElement('div');
+    t.className = 'log-time'; t.textContent = new Date(e.loggedAt).toLocaleString();
+    const body = document.createElement('div');
+    const city = document.createElement('div');
+    city.className = 'log-city'; city.textContent = e.city || 'Unknown location';
+    const meta = document.createElement('div');
+    meta.className = 'log-meta';
+    meta.textContent = `${e.latitude.toFixed(2)}, ${e.longitude.toFixed(2)} · ${e.temperature}°C, ${e.description} · wind ${e.wind} km/h · ${e.localTime} (${e.timezone})`;
+    body.appendChild(city); body.appendChild(meta);
+    row.appendChild(t); row.appendChild(body);
+    logList.appendChild(row);
+  });
+}
 
-  async function renderLog() {
-    logList.innerHTML = '<p class="meta">Loading…</p>';
-
-    let log;
-    try {
-      log = await fetchLog();
-    } catch (err) {
-      logList.innerHTML = `<p class="error">${err.message}</p>`;
-      return;
-    }
-
-    if (log === null) {
-      logList.innerHTML = '<p class="meta">Admin key required.</p>';
-      return;
-    }
-    if (!log.length) {
-      logList.innerHTML = '<p class="meta">No entries yet.</p>';
-      return;
-    }
-
-    logList.innerHTML = log.map(e => `
-      <div class="log-entry">
-        <div class="log-time">${new Date(e.loggedAt).toLocaleString()}</div>
-        <div class="log-city">${e.city || 'Unknown location'}</div>
-        <div class="meta">
-          ${e.latitude.toFixed(2)}, ${e.longitude.toFixed(2)}<br>
-          ${e.temperature}°C, ${e.description}<br>
-          💨 Wind ${e.wind} km/h &nbsp;·&nbsp; 🕒 ${e.localTime} (${e.timezone})
-        </div>
-      </div>
-    `).join('');
-  }
-
-  function toggleLog() {
-    const showing = logPanel.style.display === 'block';
-    logPanel.style.display = showing ? 'none' : 'block';
-    if (!showing) renderLog();
-  }
-
-  logBtn.addEventListener('click', toggleLog);
-
-  initIntelTabs();
-  loadWeather();
+/* ---------- boot ---------- */
+['news', 'traffic', 'events', 'overview'].forEach(c => renderModelText(c, DEMO[c]));
+if (!navigator.geolocation) load(48.1374, 11.5755, true);
+else navigator.geolocation.getCurrentPosition(
+  p => load(p.coords.latitude, p.coords.longitude, false),
+  () => load(48.1374, 11.5755, true),
+  { timeout: 9000 }
+);
 </script>
 </body>
 </html>
