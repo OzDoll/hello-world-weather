@@ -404,7 +404,7 @@ async function loadPane(cat, lat, lon, lang, demo) {
 let leafletMap = null;
 function initMap(lat, lon) {
   if (leafletMap || !window.L) return;
-  leafletMap = L.map('map').setView([lat, lon], 16);
+  leafletMap = L.map('map').setView([lat, lon], 17);
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
     maxZoom: 19
@@ -414,7 +414,7 @@ function initMap(lat, lon) {
     html: '<div style="width:22px;height:22px;border-radius:50%;background:var(--accent);border:3px solid var(--surface);box-shadow:0 0 0 6px color-mix(in oklch,var(--accent) 25%,transparent)"></div>'
   });
   L.marker([lat, lon], { icon }).addTo(leafletMap);
-  const traffic = L.tileLayer(`${API_BASE}/maps/traffic-flow-tile/{z}/{x}/{y}`, { maxZoom: 18, opacity: 0.45 });
+  const traffic = L.tileLayer(`${API_BASE}/maps/traffic-flow-tile/{z}/{x}/{y}`, { maxZoom: 18, opacity: 0.45 }).addTo(leafletMap);
   L.control.layers(null, { Traffic: traffic }).addTo(leafletMap);
   const Recenter = L.Control.extend({
     options: { position: 'topleft' },
@@ -423,7 +423,7 @@ function initMap(lat, lon) {
       const b = L.DomUtil.create('a', '', c);
       b.href = '#'; b.title = 'Center on my location'; b.textContent = '◎';
       b.style.cssText = 'display:flex;align-items:center;justify-content:center;font-size:17px';
-      L.DomEvent.on(b, 'click', L.DomEvent.stop).on(b, 'click', () => leafletMap.setView([lat, lon], 16));
+      L.DomEvent.on(b, 'click', L.DomEvent.stop).on(b, 'click', () => leafletMap.setView([lat, lon], 17));
       return c;
     }
   });
