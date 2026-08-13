@@ -1,0 +1,51 @@
+# I See You
+
+A location-aware app: on load, it geolocates the visitor and shows current weather, an hourly forecast, a live map with traffic, and AI-enriched local news/traffic/events within a 5km radius of the user's location — all localized to the user's language based on their country.
+
+**Live:** https://ozdoll.github.io/i-see-you/ (previous design preserved at [`/old/`](https://ozdoll.github.io/i-see-you/old/))
+
+## Stack
+
+**Frontend** — `index.html`, single static file, no build step, no framework. Deployed via GitHub Pages (auto-rebuilds on push to `main`).
+
+**Backend** — `api/`, Azure Functions (Node.js v4 programming model). Deployed via GitHub Actions on push to `api/**`.
+
+**Data store** — Azure Cosmos DB (SQL API): a `Log` container (visit history) and an `AiCache` container (AI response caching, keyed by location + language, 20 min TTL).
+
+**Infrastructure** — `infra/`, Bicep templates, deployed via GitHub Actions on push to `infra/**`. Auth throughout is Managed Identity — no API keys stored anywhere.
+
+## APIs & services used
+
+| Service | Used for | Auth |
+|---|---|---|
+| Browser Geolocation API | Visitor's lat/lon | — |
+| [Open-Meteo](https://open-meteo.com/) | Current weather + hourly forecast | Keyless |
+| [Nominatim](https://nominatim.org/) (OpenStreetMap) | Reverse geocoding → city/country | Keyless |
+| Leaflet + OpenStreetMap tiles | Interactive map | Keyless |
+| Google Fonts | Typography | Keyless |
+| **Azure OpenAI (GPT-5)** | AI-generated news/events summaries via the Responses API's `web_search` tool; traffic summaries and a synthesized overview via plain chat completions | Managed Identity |
+| **Azure Maps** | Real-time traffic incidents (feeds the traffic summary) and traffic-flow tile overlay on the map (proxied server-side, since tile auth is header-only) | Managed Identity |
+| Azure Cosmos DB | Visit log + AI response cache | Managed Identity |
+| Azure Functions | All backend API endpoints | — |
+| Application Insights | Backend telemetry | — |
+
+## "Agents"
+
+There's no persistent/autonomous agent — each AI endpoint is a single stateless request per visitor, generated once per location+language then cached:
+
+- **News / Events** — GPT-5 with the Responses API's `web_search` tool, live web search grounded in the visitor's coordinates.
+- **Traffic** — GPT-5 chat completion summarizing structured real-time incident data pulled from Azure Maps (not search-grounded — general web search doesn't index live traffic).
+- **Overview** — GPT-5 chat completion synthesizing the three summaries above into one short narrative.
+
+All AI output is localized (English, Spanish, Portuguese, French, German, or Italian) based on the visitor's country, and rendered client-side via `textContent`/DOM APIs only — never `innerHTML` — since it's untrusted content flowing from live search results through an LLM.
+
+## Repo layout
+
+```
+index.html       # live frontend
+old/index.html    # previous design, kept for comparison
+api/              # Azure Functions backend
+infra/            # Bicep infrastructure-as-code
+```
+
+See `CLAUDE.md` for detailed architecture notes, known gotchas, and incident history.
