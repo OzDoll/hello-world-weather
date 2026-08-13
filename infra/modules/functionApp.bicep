@@ -37,6 +37,9 @@ resource functionApp 'Microsoft.Web/sites@2023-12-01' = {
   name: functionAppName
   location: location
   kind: 'functionapp'
+  identity: {
+    type: 'SystemAssigned'
+  }
   properties: {
     serverFarmId: plan.id
     httpsOnly: false
@@ -50,3 +53,4 @@ resource functionApp 'Microsoft.Web/sites@2023-12-01' = {
 
 output functionAppName string = functionApp.name
 output defaultHostName string = functionApp.properties.defaultHostName
+output principalId string = functionApp.identity.principalId

@@ -9,11 +9,27 @@ Bicep templates for the Azure resources behind `hello-world-weather`'s backend (
 | Resource group | `hello-world-weather-rg` | Not managed by this template — created before it, deploy targets it as scope. |
 | Storage account | `helloworldweathersa` | West Europe, Standard_LRS. Required by the Functions runtime; app code doesn't use it directly. |
 | App Service Plan | `WestEuropePlan` | Consumption (Y1/Dynamic), **Windows** — `az functionapp create` defaults to Windows when `--os-type` isn't passed, which is what happened here. |
-| Function App | `hello-world-weather-api` | Node 22, Functions v4, HTTP-only not enforced (`httpsOnly: false`, matching what's live — see Known gaps below). CORS allows `https://ozdoll.github.io` and `http://localhost:8000`. **App settings are deliberately not managed by this Bicep** — see below. |
+| Function App | `hello-world-weather-api` | Node 22, Functions v4, HTTP-only not enforced (`httpsOnly: false`, matching what's live — see Known gaps below). CORS allows `https://ozdoll.github.io` and `http://localhost:8000`. Has a system-assigned managed identity (see below). **App settings are deliberately not managed by this Bicep** — see below. |
 | Application Insights | `hello-world-weather-api` | Auto-created by `az functionapp create` alongside the Function App; not something explicitly asked for originally, but it exists and is wired up via `APPLICATIONINSIGHTS_CONNECTION_STRING`, so it's modeled here. |
 | Cosmos DB account | `hello-world-weather-cosmos` | Free tier, Session consistency. **Data region is Sweden Central**, not West Europe like everything else — see below. |
 | Cosmos SQL database | `WeatherApp` | — |
 | Cosmos SQL container | `Log` | Partition key `/id`, default TTL 2,592,000s (30 days) so entries self-prune. |
+
+### AI features depend on a resource this template does not own
+
+`hello-world-weather-api` has a system-assigned managed identity (`identity: { type: 'SystemAssigned' }` in `modules/functionApp.bicep`), granted the **`Cognitive Services OpenAI User`** role scoped to `medirian-resource` (Cognitive Services/AI Services account, resource group `rg-medirian`, Sweden Central) — an existing resource from other work, reused here rather than provisioning a dedicated Azure OpenAI resource for this app. It hosts the `gpt-5` model deployment the AI features (`api/src/functions/aiPing.js` and whatever's built on top of it) call.
+
+**This is a one-directional dependency this template cannot see or protect.** `rg-medirian` and `medirian-resource` are entirely outside `hello-world-weather-rg` and this Bicep's scope. If that resource, its `gpt-5` deployment, or the role assignment is ever changed or removed by whatever else uses it, this app's AI endpoints break with zero warning from anything in this repo — `what-if` against `hello-world-weather-rg` will never surface it. The role assignment itself was created directly via `az role assignment create --scope <medirian-resource-id>`, not through this template (cross-resource-group role assignments from a resource-group-scoped Bicep deployment need extra scope plumbing not worth adding for a single role grant); if it's ever lost, recreate it with:
+```bash
+MSYS_NO_PATHCONV=1 az role assignment create \
+  --assignee-object-id <functionApp-principalId-from-`az functionapp identity show`> \
+  --assignee-principal-type ServicePrincipal \
+  --role "Cognitive Services OpenAI User" \
+  --scope "/subscriptions/<sub>/resourceGroups/rg-medirian/providers/Microsoft.CognitiveServices/accounts/medirian-resource"
+```
+(The `MSYS_NO_PATHCONV=1` prefix matters in Git Bash — without it, the leading `/subscriptions/...` in `--scope` gets silently rewritten into a broken Windows path.)
+
+App settings `AZURE_OPENAI_ENDPOINT` and `AZURE_OPENAI_DEPLOYMENT` (both non-secret — no API key is used, auth is Managed Identity) are set the same safe way as `COSMOS_CONNECTION_STRING`: `az functionapp config appsettings set`, never Bicep's `appSettings`.
 
 ### Why Cosmos DB is in Sweden Central
 

@@ -45,6 +45,7 @@ module functionApp 'modules/functionApp.bicep' = {
 
 output functionAppUrl string = 'https://${functionApp.outputs.defaultHostName}/api'
 output functionAppName string = functionApp.outputs.functionAppName
+output functionAppPrincipalId string = functionApp.outputs.principalId
 output storageAccountName string = storage.outputs.storageAccountName
 output cosmosAccountName string = cosmos.outputs.accountName
 output appInsightsName string = appInsightsName
