@@ -1,5 +1,5 @@
 const { app } = require('@azure/functions');
-const { getAiClient } = require('../lib/aiClient');
+const { completeChat } = require('../lib/aiClient');
 const { generateNews, generateEvents, generateTraffic } = require('../lib/generators');
 const { getCachedOrGenerate, parseLatLon, parseLang } = require('../lib/cache');
 
@@ -10,19 +10,14 @@ async function synthesizeOverview(lat, lon, lang) {
     getCachedOrGenerate('events', lat, lon, lang, () => generateEvents(lat, lon, lang))
   ]);
 
-  const response = await getAiClient().chat.completions.create({
-    model: process.env.AZURE_OPENAI_DEPLOYMENT,
-    messages: [
-      {
-        role: 'user',
-        content: `Combine these three local summaries into one cohesive 3-5 sentence overview for a visitor to this area. Weave them into a natural narrative rather than just listing them. Respond in ${lang}.\n\nNews: ${news.text}\n\nTraffic: ${traffic.text}\n\nEvents: ${events.text}`
-      }
-    ],
-    max_completion_tokens: 1000,
-    reasoning_effort: 'low'
-  });
+  const content = await completeChat([
+    {
+      role: 'user',
+      content: `Combine these three local summaries into one cohesive 3-5 sentence overview for a visitor to this area. Weave them into a natural narrative rather than just listing them. Respond in ${lang}.\n\nNews: ${news.text}\n\nTraffic: ${traffic.text}\n\nEvents: ${events.text}`
+    }
+  ]);
 
-  return response.choices[0]?.message?.content || 'Overview could not be generated.';
+  return content || 'Overview could not be generated.';
 }
 
 app.http('aiOverview', {

@@ -44,7 +44,12 @@ async function getTrafficIncidents(lat, lon) {
 
 async function getTrafficFlowTile(z, x, y) {
   const token = await getTokenProvider()();
-  const url = `https://atlas.microsoft.com/traffic/flow/tile/png?api-version=1.0&style=absolute&zoom=${z}&x=${x}&y=${y}&thickness=10`;
+  // "relative" colors by how current speed compares to that road's own free-flow
+  // speed, not raw absolute speed — "absolute" made e.g. slow residential streets
+  // show red/orange even at 4am with zero real congestion, since their normal speed
+  // is just objectively low. "relative" is Microsoft's own recommended default for
+  // visualizing genuine congestion.
+  const url = `https://atlas.microsoft.com/traffic/flow/tile/png?api-version=1.0&style=relative&zoom=${z}&x=${x}&y=${y}&thickness=10`;
 
   const res = await fetch(url, {
     headers: {

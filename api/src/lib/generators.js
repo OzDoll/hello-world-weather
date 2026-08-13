@@ -1,4 +1,4 @@
-const { getResponsesClient, getAiClient } = require('./aiClient');
+const { getResponsesClient, completeChat } = require('./aiClient');
 const { getTrafficIncidents } = require('./mapsClient');
 
 async function generateNews(lat, lon, lang) {
@@ -26,19 +26,14 @@ async function generateTraffic(lat, lon, lang) {
     return 'No significant traffic incidents reported within 5km right now.';
   }
 
-  const response = await getAiClient().chat.completions.create({
-    model: process.env.AZURE_OPENAI_DEPLOYMENT,
-    messages: [
-      {
-        role: 'user',
-        content: `Summarize these real-time traffic incidents for a general audience, prioritizing the most severe/impactful ones. Format your response as a bulleted list: one item per line, each starting with "- ". Keep each bullet to one sentence. Respond in ${lang}. Data:\n\n${JSON.stringify(incidents)}`
-      }
-    ],
-    max_completion_tokens: 1000,
-    reasoning_effort: 'low'
-  });
+  const content = await completeChat([
+    {
+      role: 'user',
+      content: `Summarize these real-time traffic incidents for a general audience, prioritizing the most severe/impactful ones. Format your response as a bulleted list: one item per line, each starting with "- ". Keep each bullet to one sentence. Respond in ${lang}. Data:\n\n${JSON.stringify(incidents)}`
+    }
+  ]);
 
-  return response.choices[0]?.message?.content || 'Traffic incidents found nearby, but the summary could not be generated.';
+  return content || 'Traffic incidents found nearby, but the summary could not be generated.';
 }
 
 module.exports = { generateNews, generateEvents, generateTraffic };

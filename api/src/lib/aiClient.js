@@ -35,4 +35,28 @@ function getResponsesClient() {
   return responsesClient;
 }
 
-module.exports = { getAiClient, getResponsesClient };
+// GPT-5 can spend its entire max_completion_tokens budget on internal reasoning and
+// return empty content with zero errors — hit repeatedly during development (at 20,
+// 300, 500, and 1000-token ceilings, with reasoning_effort: 'low' set). Raising the
+// ceiling alone isn't reliable since this is non-deterministic per call, not a fixed
+// shortfall — so retry once on empty content rather than guessing at ever-higher
+// numbers. Shared by every plain (non-search) chat completion call.
+async function completeChat(messages, opts = {}) {
+  const params = {
+    model: process.env.AZURE_OPENAI_DEPLOYMENT,
+    messages,
+    max_completion_tokens: 2000,
+    reasoning_effort: 'low',
+    ...opts
+  };
+
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const response = await getAiClient().chat.completions.create(params);
+    const content = response.choices[0]?.message?.content;
+    if (content) return content;
+  }
+
+  return null;
+}
+
+module.exports = { getAiClient, getResponsesClient, completeChat };
